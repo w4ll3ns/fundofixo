@@ -10,6 +10,8 @@ interface AuthContextType {
   loading: boolean;
   role: UserRole | null;
   isAdmin: boolean;
+  hasConsultiveAccess: boolean;
+  consultiveEmpresas: string[];
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (email: string, password: string, nome: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
@@ -22,6 +24,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [role, setRole] = useState<UserRole | null>(null);
+  const [hasConsultiveAccess, setHasConsultiveAccess] = useState(false);
+  const [consultiveEmpresas, setConsultiveEmpresas] = useState<string[]>([]);
 
   const fetchUserRole = async (userId: string) => {
     const { data, error } = await supabase
@@ -37,6 +41,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const fetchConsultiveAccess = async (userId: string) => {
+    const { data, error } = await supabase
+      .from('usuario_empresa_acesso')
+      .select('empresa_id')
+      .eq('user_id', userId);
+
+    if (data && !error && data.length > 0) {
+      setHasConsultiveAccess(true);
+      setConsultiveEmpresas(data.map(d => d.empresa_id));
+    } else {
+      setHasConsultiveAccess(false);
+      setConsultiveEmpresas([]);
+    }
+  };
+
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
@@ -46,9 +65,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (session?.user) {
           setTimeout(() => {
             fetchUserRole(session.user.id);
+            fetchConsultiveAccess(session.user.id);
           }, 0);
         } else {
           setRole(null);
+          setHasConsultiveAccess(false);
+          setConsultiveEmpresas([]);
         }
         setLoading(false);
       }
@@ -59,6 +81,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(session?.user ?? null);
       if (session?.user) {
         fetchUserRole(session.user.id);
+        fetchConsultiveAccess(session.user.id);
       }
       setLoading(false);
     });
@@ -89,6 +112,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setSession(null);
     setRole(null);
+    setHasConsultiveAccess(false);
+    setConsultiveEmpresas([]);
   };
 
   return (
@@ -98,6 +123,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       loading,
       role,
       isAdmin: role === 'admin',
+      hasConsultiveAccess,
+      consultiveEmpresas,
       signIn,
       signUp,
       signOut
