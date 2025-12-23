@@ -8,8 +8,7 @@ import { StatusBadge } from '@/components/ui/status-badge';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatCurrency, formatDate } from '@/lib/masks';
-import { FileText, Clock, CheckCircle, AlertTriangle, PlusCircle, FileUp } from 'lucide-react';
-import { ModalImportarNota } from '@/components/user/ModalImportarNota';
+import { FileText, Clock, CheckCircle, AlertTriangle, PlusCircle } from 'lucide-react';
 
 interface Solicitacao {
   id: string;
@@ -32,7 +31,6 @@ export default function UserDashboard() {
   const [stats, setStats] = useState<Stats>({ total: 0, pendentes: 0, entregues: 0, pendentesAjuste: 0 });
   const [recentSolicitacoes, setRecentSolicitacoes] = useState<Solicitacao[]>([]);
   const [loading, setLoading] = useState(true);
-  const [importModalOpen, setImportModalOpen] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -92,18 +90,12 @@ export default function UserDashboard() {
             <h1 className="text-2xl font-bold text-foreground">Meu Dashboard</h1>
             <p className="text-muted-foreground">Acompanhe suas solicitações de fundo fixo</p>
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => setImportModalOpen(true)}>
-              <FileUp className="mr-2 h-4 w-4" />
-              Importar Nota
-            </Button>
-            <Button asChild>
-              <Link to="/nova-solicitacao">
-                <PlusCircle className="mr-2 h-4 w-4" />
-                Nova Solicitação
-              </Link>
-            </Button>
-          </div>
+          <Button asChild>
+            <Link to="/nova-solicitacao">
+              <PlusCircle className="mr-2 h-4 w-4" />
+              Nova Solicitação
+            </Link>
+          </Button>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -180,8 +172,6 @@ export default function UserDashboard() {
           )}
         </Card>
       </div>
-
-      <ModalImportarNota open={importModalOpen} onOpenChange={setImportModalOpen} />
     </AppLayout>
   );
 }
