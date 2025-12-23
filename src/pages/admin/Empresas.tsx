@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogBody } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -258,40 +258,42 @@ export default function Empresas() {
             <DialogHeader>
               <DialogTitle>{editingEmpresa ? 'Editar Empresa' : 'Nova Empresa'}</DialogTitle>
             </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label>Nome Fantasia *</Label>
-                <Input
-                  value={form.nome_fantasia}
-                  onChange={(e) => setForm({ ...form, nome_fantasia: e.target.value })}
-                  placeholder="Ex: OXYGENI HUB"
-                />
+            <DialogBody>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Nome Fantasia *</Label>
+                  <Input
+                    value={form.nome_fantasia}
+                    onChange={(e) => setForm({ ...form, nome_fantasia: e.target.value })}
+                    placeholder="Ex: OXYGENI HUB"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>CNPJ *</Label>
+                  <Input
+                    value={form.cnpj}
+                    onChange={handleCNPJChange}
+                    placeholder="00.000.000/0000-00"
+                    maxLength={18}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Unidade/Descrição</Label>
+                  <Input
+                    value={form.unidade}
+                    onChange={(e) => setForm({ ...form, unidade: e.target.value })}
+                    placeholder="Ex: Filial Centro"
+                  />
+                </div>
+                <div className="flex items-center gap-3">
+                  <Switch
+                    checked={form.status}
+                    onCheckedChange={(checked) => setForm({ ...form, status: checked })}
+                  />
+                  <Label>Empresa ativa</Label>
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label>CNPJ *</Label>
-                <Input
-                  value={form.cnpj}
-                  onChange={handleCNPJChange}
-                  placeholder="00.000.000/0000-00"
-                  maxLength={18}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Unidade/Descrição</Label>
-                <Input
-                  value={form.unidade}
-                  onChange={(e) => setForm({ ...form, unidade: e.target.value })}
-                  placeholder="Ex: Filial Centro"
-                />
-              </div>
-              <div className="flex items-center gap-3">
-                <Switch
-                  checked={form.status}
-                  onCheckedChange={(checked) => setForm({ ...form, status: checked })}
-                />
-                <Label>Empresa ativa</Label>
-              </div>
-            </div>
+            </DialogBody>
             <DialogFooter>
               <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
               <Button onClick={handleSubmit}>{editingEmpresa ? 'Salvar' : 'Criar'}</Button>

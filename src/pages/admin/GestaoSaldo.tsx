@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription, DialogBody } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -293,43 +293,45 @@ export default function GestaoSaldo() {
                 Insira dinheiro no fundo fixo de uma empresa
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label>Empresa *</Label>
-                <Select
-                  value={addForm.empresa_id}
-                  onValueChange={(value) => setAddForm({ ...addForm, empresa_id: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione a empresa" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {empresas.map((empresa) => (
-                      <SelectItem key={empresa.id} value={empresa.id}>
-                        {empresa.nome_fantasia}
-                        {empresa.unidade && ` - ${empresa.unidade}`}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+            <DialogBody>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Empresa *</Label>
+                  <Select
+                    value={addForm.empresa_id}
+                    onValueChange={(value) => setAddForm({ ...addForm, empresa_id: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione a empresa" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {empresas.map((empresa) => (
+                        <SelectItem key={empresa.id} value={empresa.id}>
+                          {empresa.nome_fantasia}
+                          {empresa.unidade && ` - ${empresa.unidade}`}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Valor a Adicionar *</Label>
+                  <Input
+                    value={addForm.valor}
+                    onChange={(e) => setAddForm({ ...addForm, valor: maskCurrency(e.target.value) })}
+                    placeholder="R$ 0,00"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Observação</Label>
+                  <Textarea
+                    value={addForm.observacao}
+                    onChange={(e) => setAddForm({ ...addForm, observacao: e.target.value })}
+                    placeholder="Ex: Reposição mensal, aporte extra..."
+                  />
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label>Valor a Adicionar *</Label>
-                <Input
-                  value={addForm.valor}
-                  onChange={(e) => setAddForm({ ...addForm, valor: maskCurrency(e.target.value) })}
-                  placeholder="R$ 0,00"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Observação</Label>
-                <Textarea
-                  value={addForm.observacao}
-                  onChange={(e) => setAddForm({ ...addForm, observacao: e.target.value })}
-                  placeholder="Ex: Reposição mensal, aporte extra..."
-                />
-              </div>
-            </div>
+            </DialogBody>
             <DialogFooter>
               <Button variant="outline" onClick={() => setAddDialogOpen(false)}>Cancelar</Button>
               <Button onClick={handleAddSaldo}>Adicionar Saldo</Button>
@@ -347,7 +349,7 @@ export default function GestaoSaldo() {
                 {selectedFundo?.empresas?.unidade && ` - ${selectedFundo.empresas.unidade}`}
               </DialogDescription>
             </DialogHeader>
-            <div className="max-h-96 overflow-y-auto">
+            <DialogBody>
               {historico.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   Nenhuma movimentação registrada
@@ -368,8 +370,8 @@ export default function GestaoSaldo() {
                           <ArrowDown className="h-4 w-4 text-destructive" />
                         )}
                       </div>
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2">
                           <p className="font-medium">
                             {item.tipo === 'entrada' ? '+' : '-'} {formatCurrency(item.valor)}
                           </p>
@@ -377,7 +379,7 @@ export default function GestaoSaldo() {
                             {item.tipo === 'entrada' ? 'Entrada' : 'Saída'}
                           </Badge>
                         </div>
-                        <p className="text-sm text-muted-foreground">{item.descricao || '-'}</p>
+                        <p className="text-sm text-muted-foreground truncate">{item.descricao || '-'}</p>
                         <p className="text-xs text-muted-foreground mt-1">
                           {formatDateTime(item.created_at)} • 
                           Saldo: {formatCurrency(item.saldo_anterior)} → {formatCurrency(item.saldo_posterior)}
@@ -387,7 +389,7 @@ export default function GestaoSaldo() {
                   ))}
                 </div>
               )}
-            </div>
+            </DialogBody>
           </DialogContent>
         </Dialog>
       </div>
