@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogBody } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -223,7 +223,7 @@ export function ModalBaixaAdmin({ open, onOpenChange, solicitacao, onSuccess }: 
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>Realizar Baixa</DialogTitle>
           <DialogDescription>
@@ -231,163 +231,165 @@ export function ModalBaixaAdmin({ open, onOpenChange, solicitacao, onSuccess }: 
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-4">
-          {/* File Upload */}
-          <div className="space-y-2">
-            <Label>Nota Fiscal (PDF/JPG/PNG) *</Label>
-            <div className={cn(
-              "border-2 border-dashed rounded-lg p-4 text-center transition-colors",
-              file ? "border-success bg-success/5" : "border-border hover:border-primary/50"
-            )}>
-              {uploading || processing ? (
-                <div className="flex flex-col items-center gap-2">
-                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                  <p className="text-sm text-muted-foreground">
-                    {uploading ? 'Enviando arquivo...' : 'Processando nota com IA...'}
+        <DialogBody>
+          <div className="space-y-4">
+            {/* File Upload */}
+            <div className="space-y-2">
+              <Label>Nota Fiscal (PDF/JPG/PNG) *</Label>
+              <div className={cn(
+                "border-2 border-dashed rounded-lg p-4 text-center transition-colors",
+                file ? "border-success bg-success/5" : "border-border hover:border-primary/50"
+              )}>
+                {uploading || processing ? (
+                  <div className="flex flex-col items-center gap-2">
+                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                    <p className="text-sm text-muted-foreground">
+                      {uploading ? 'Enviando arquivo...' : 'Processando nota com IA...'}
+                    </p>
+                  </div>
+                ) : file ? (
+                  <div className="flex flex-col items-center gap-2">
+                    <FileText className="h-6 w-6 text-success" />
+                    <p className="text-sm font-medium">{file.name}</p>
+                    <Button variant="ghost" size="sm" onClick={() => document.getElementById('admin-file-input')?.click()}>
+                      Trocar arquivo
+                    </Button>
+                  </div>
+                ) : (
+                  <label htmlFor="admin-file-input" className="cursor-pointer">
+                    <Upload className="h-6 w-6 mx-auto text-muted-foreground mb-2" />
+                    <p className="text-sm text-muted-foreground">Clique para enviar</p>
+                  </label>
+                )}
+                <input
+                  id="admin-file-input"
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png"
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
+              </div>
+            </div>
+
+            {/* AI Result Feedback */}
+            {aiResult && (
+              <div className={cn(
+                "p-3 rounded-lg flex items-start gap-3",
+                aiResult.confidence_label === 'alta' ? "bg-success/10" :
+                aiResult.confidence_label === 'media' ? "bg-warning/10" : "bg-destructive/10"
+              )}>
+                {aiResult.confidence_label === 'alta' ? (
+                  <CheckCircle className="h-4 w-4 text-success flex-shrink-0 mt-0.5" />
+                ) : aiResult.confidence_label === 'media' ? (
+                  <AlertTriangle className="h-4 w-4 text-warning flex-shrink-0 mt-0.5" />
+                ) : (
+                  <XCircle className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
+                )}
+                <div className="text-sm">
+                  <p className="font-medium">
+                    Confiança {aiResult.confidence_label === 'alta' ? 'Alta' : aiResult.confidence_label === 'media' ? 'Média' : 'Baixa'}
+                  </p>
+                  <p className="text-muted-foreground">
+                    Valor: {formatCurrency(aiResult.total_value || 0)}
                   </p>
                 </div>
-              ) : file ? (
-                <div className="flex flex-col items-center gap-2">
-                  <FileText className="h-6 w-6 text-success" />
-                  <p className="text-sm font-medium">{file.name}</p>
-                  <Button variant="ghost" size="sm" onClick={() => document.getElementById('admin-file-input')?.click()}>
-                    Trocar arquivo
-                  </Button>
-                </div>
-              ) : (
-                <label htmlFor="admin-file-input" className="cursor-pointer">
-                  <Upload className="h-6 w-6 mx-auto text-muted-foreground mb-2" />
-                  <p className="text-sm text-muted-foreground">Clique para enviar</p>
-                </label>
-              )}
-              <input
-                id="admin-file-input"
-                type="file"
-                accept=".pdf,.jpg,.jpeg,.png"
-                onChange={handleFileChange}
-                className="hidden"
-              />
-            </div>
-          </div>
+              </div>
+            )}
 
-          {/* AI Result Feedback */}
-          {aiResult && (
-            <div className={cn(
-              "p-3 rounded-lg flex items-start gap-3",
-              aiResult.confidence_label === 'alta' ? "bg-success/10" :
-              aiResult.confidence_label === 'media' ? "bg-warning/10" : "bg-destructive/10"
-            )}>
-              {aiResult.confidence_label === 'alta' ? (
-                <CheckCircle className="h-4 w-4 text-success flex-shrink-0 mt-0.5" />
-              ) : aiResult.confidence_label === 'media' ? (
-                <AlertTriangle className="h-4 w-4 text-warning flex-shrink-0 mt-0.5" />
-              ) : (
+            {aiError && (
+              <div className="p-3 rounded-lg bg-destructive/10 flex items-start gap-3">
                 <XCircle className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
-              )}
-              <div className="text-sm">
-                <p className="font-medium">
-                  Confiança {aiResult.confidence_label === 'alta' ? 'Alta' : aiResult.confidence_label === 'media' ? 'Média' : 'Baixa'}
-                </p>
-                <p className="text-muted-foreground">
-                  Valor: {formatCurrency(aiResult.total_value || 0)}
-                </p>
+                <p className="text-sm">Preencha os campos manualmente</p>
+              </div>
+            )}
+
+            {/* Form Fields */}
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Valor Gasto Real *</Label>
+                <Input
+                  value={valorGastoDisplay}
+                  onChange={(e) => setValorGastoDisplay(maskCurrency(e.target.value))}
+                  placeholder="R$ 0,00"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Data de Emissão</Label>
+                <Input
+                  type="date"
+                  value={dataEmissao}
+                  onChange={(e) => setDataEmissao(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Número da Nota</Label>
+                <Input
+                  value={numeroNota}
+                  onChange={(e) => setNumeroNota(e.target.value)}
+                  placeholder="Ex: 12345"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>CNPJ Emitente</Label>
+                <Input
+                  value={cnpjEmitente}
+                  onChange={(e) => setCnpjEmitente(maskCNPJ(e.target.value))}
+                  placeholder="00.000.000/0000-00"
+                  maxLength={18}
+                />
               </div>
             </div>
-          )}
 
-          {aiError && (
-            <div className="p-3 rounded-lg bg-destructive/10 flex items-start gap-3">
-              <XCircle className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
-              <p className="text-sm">Preencha os campos manualmente</p>
-            </div>
-          )}
-
-          {/* Form Fields */}
-          <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label>Valor Gasto Real *</Label>
+              <Label>Nome do Emitente</Label>
               <Input
-                value={valorGastoDisplay}
-                onChange={(e) => setValorGastoDisplay(maskCurrency(e.target.value))}
-                placeholder="R$ 0,00"
+                value={nomeEmitente}
+                onChange={(e) => setNomeEmitente(e.target.value)}
+                placeholder="Nome da empresa"
               />
             </div>
+
             <div className="space-y-2">
-              <Label>Data de Emissão</Label>
-              <Input
-                type="date"
-                value={dataEmissao}
-                onChange={(e) => setDataEmissao(e.target.value)}
+              <Label>Descrição da Compra</Label>
+              <Textarea
+                value={descricaoCompra}
+                onChange={(e) => setDescricaoCompra(e.target.value)}
+                placeholder="Descreva o que foi comprado..."
+                rows={2}
               />
             </div>
-            <div className="space-y-2">
-              <Label>Número da Nota</Label>
-              <Input
-                value={numeroNota}
-                onChange={(e) => setNumeroNota(e.target.value)}
-                placeholder="Ex: 12345"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>CNPJ Emitente</Label>
-              <Input
-                value={cnpjEmitente}
-                onChange={(e) => setCnpjEmitente(maskCNPJ(e.target.value))}
-                placeholder="00.000.000/0000-00"
-                maxLength={18}
-              />
-            </div>
-          </div>
 
-          <div className="space-y-2">
-            <Label>Nome do Emitente</Label>
-            <Input
-              value={nomeEmitente}
-              onChange={(e) => setNomeEmitente(e.target.value)}
-              placeholder="Nome da empresa"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label>Descrição da Compra</Label>
-            <Textarea
-              value={descricaoCompra}
-              onChange={(e) => setDescricaoCompra(e.target.value)}
-              placeholder="Descreva o que foi comprado..."
-              rows={2}
-            />
-          </div>
-
-          {/* Troco Preview */}
-          {valorGasto > 0 && (
-            <div className={cn(
-              "p-3 rounded-lg",
-              trocoReal > 0 ? "bg-success/10" : trocoReal < 0 ? "bg-warning/10" : "bg-muted"
-            )}>
-              <div className="grid gap-2 grid-cols-3 text-center text-sm">
-                <div>
-                  <p className="text-xs text-muted-foreground">Entregue</p>
-                  <p className="font-medium">{formatCurrency(solicitacao.valor_entregue || 0)}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Gasto</p>
-                  <p className="font-medium">{formatCurrency(valorGasto)}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">
-                    {trocoReal > 0 ? 'Troco' : trocoReal < 0 ? 'Diferença' : 'Troco'}
-                  </p>
-                  <p className={cn(
-                    "font-bold",
-                    trocoReal > 0 ? "text-success" : trocoReal < 0 ? "text-warning" : ""
-                  )}>
-                    {formatCurrency(Math.abs(trocoReal))}
-                  </p>
+            {/* Troco Preview */}
+            {valorGasto > 0 && (
+              <div className={cn(
+                "p-3 rounded-lg",
+                trocoReal > 0 ? "bg-success/10" : trocoReal < 0 ? "bg-warning/10" : "bg-muted"
+              )}>
+                <div className="grid gap-2 grid-cols-3 text-center text-sm">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Entregue</p>
+                    <p className="font-medium">{formatCurrency(solicitacao.valor_entregue || 0)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Gasto</p>
+                    <p className="font-medium">{formatCurrency(valorGasto)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">
+                      {trocoReal > 0 ? 'Troco' : trocoReal < 0 ? 'Diferença' : 'Troco'}
+                    </p>
+                    <p className={cn(
+                      "font-bold",
+                      trocoReal > 0 ? "text-success" : trocoReal < 0 ? "text-warning" : ""
+                    )}>
+                      {formatCurrency(Math.abs(trocoReal))}
+                    </p>
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        </DialogBody>
 
         <DialogFooter>
           <Button variant="outline" onClick={() => handleOpenChange(false)}>Cancelar</Button>

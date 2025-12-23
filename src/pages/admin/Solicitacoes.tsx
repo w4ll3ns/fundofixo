@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription, DialogBody } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -480,89 +480,91 @@ export default function AdminSolicitacoes() {
             </DialogHeader>
             
             {selectedSolicitacao && (
-              <div className="space-y-4 py-4">
-                {/* Info sobre saldo (apenas FUNDO_FIXO) */}
-                {selectedSolicitacao.tipo_solicitacao === 'FUNDO_FIXO' && (
-                  <Alert>
-                    <Wallet className="h-4 w-4" />
-                    <AlertDescription>
-                      Saldo disponível da empresa: <strong>{formatCurrency(getSaldoEmpresa(selectedSolicitacao.empresa_id))}</strong>
-                    </AlertDescription>
-                  </Alert>
-                )}
-
-                <div className="space-y-2">
-                  <Label>Valor Entregue *</Label>
-                  <Input
-                    value={valorEntregue}
-                    onChange={(e) => setValorEntregue(maskCurrency(e.target.value))}
-                    placeholder="R$ 0,00"
-                  />
-                  {parseCurrency(valorEntregue) < selectedSolicitacao.valor_solicitado && (
-                    <p className="text-sm text-warning">Valor menor que o solicitado</p>
-                  )}
-                  {parseCurrency(valorEntregue) > LIMITE_MAXIMO_SOLICITACAO && (
-                    <p className="text-sm text-destructive flex items-center gap-1">
-                      <AlertTriangle className="h-4 w-4" />
-                      Excede limite máximo de {formatCurrency(LIMITE_MAXIMO_SOLICITACAO)}
-                    </p>
-                  )}
-                  {selectedSolicitacao.tipo_solicitacao === 'FUNDO_FIXO' && 
-                   parseCurrency(valorEntregue) > getSaldoEmpresa(selectedSolicitacao.empresa_id) && (
-                    <p className="text-sm text-warning flex items-center gap-1">
+              <DialogBody>
+                <div className="space-y-4">
+                  {/* Info sobre saldo (apenas FUNDO_FIXO) */}
+                  {selectedSolicitacao.tipo_solicitacao === 'FUNDO_FIXO' && (
+                    <Alert>
                       <Wallet className="h-4 w-4" />
-                      Excede saldo disponível do fundo
-                    </p>
+                      <AlertDescription>
+                        Saldo disponível da empresa: <strong>{formatCurrency(getSaldoEmpresa(selectedSolicitacao.empresa_id))}</strong>
+                      </AlertDescription>
+                    </Alert>
                   )}
-                </div>
 
-                <div className="space-y-2">
-                  <Label>Forma de Entrega</Label>
-                  <Select value={formaEntrega} onValueChange={setFormaEntrega}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="dinheiro">Dinheiro</SelectItem>
-                      <SelectItem value="pix">PIX</SelectItem>
-                      <SelectItem value="outro">Outro</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Observações</Label>
-                  <Textarea value={observacoes} onChange={(e) => setObservacoes(e.target.value)} placeholder="Opcional..." />
-                </div>
-
-                {/* Autorização de excesso */}
-                {(parseCurrency(valorEntregue) > LIMITE_MAXIMO_SOLICITACAO || 
-                  (selectedSolicitacao.tipo_solicitacao === 'FUNDO_FIXO' && 
-                   parseCurrency(valorEntregue) > getSaldoEmpresa(selectedSolicitacao.empresa_id))) && (
-                  <div className="space-y-4 p-4 rounded-lg border border-warning bg-warning/5">
-                    <div className="flex items-center space-x-2">
-                      <Checkbox 
-                        id="autorizar" 
-                        checked={autorizarExcesso}
-                        onCheckedChange={(checked) => setAutorizarExcesso(!!checked)}
-                      />
-                      <Label htmlFor="autorizar" className="text-warning font-medium cursor-pointer">
-                        Autorizo exceder o limite/saldo
-                      </Label>
-                    </div>
-                    {autorizarExcesso && (
-                      <div className="space-y-2">
-                        <Label>Justificativa da Autorização *</Label>
-                        <Textarea 
-                          value={justificativaExcesso} 
-                          onChange={(e) => setJustificativaExcesso(e.target.value)}
-                          placeholder="Explique o motivo da autorização..."
-                        />
-                      </div>
+                  <div className="space-y-2">
+                    <Label>Valor Entregue *</Label>
+                    <Input
+                      value={valorEntregue}
+                      onChange={(e) => setValorEntregue(maskCurrency(e.target.value))}
+                      placeholder="R$ 0,00"
+                    />
+                    {parseCurrency(valorEntregue) < selectedSolicitacao.valor_solicitado && (
+                      <p className="text-sm text-warning">Valor menor que o solicitado</p>
+                    )}
+                    {parseCurrency(valorEntregue) > LIMITE_MAXIMO_SOLICITACAO && (
+                      <p className="text-sm text-destructive flex items-center gap-1">
+                        <AlertTriangle className="h-4 w-4" />
+                        Excede limite máximo de {formatCurrency(LIMITE_MAXIMO_SOLICITACAO)}
+                      </p>
+                    )}
+                    {selectedSolicitacao.tipo_solicitacao === 'FUNDO_FIXO' && 
+                     parseCurrency(valorEntregue) > getSaldoEmpresa(selectedSolicitacao.empresa_id) && (
+                      <p className="text-sm text-warning flex items-center gap-1">
+                        <Wallet className="h-4 w-4" />
+                        Excede saldo disponível do fundo
+                      </p>
                     )}
                   </div>
-                )}
-              </div>
+
+                  <div className="space-y-2">
+                    <Label>Forma de Entrega</Label>
+                    <Select value={formaEntrega} onValueChange={setFormaEntrega}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="dinheiro">Dinheiro</SelectItem>
+                        <SelectItem value="pix">PIX</SelectItem>
+                        <SelectItem value="outro">Outro</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Observações</Label>
+                    <Textarea value={observacoes} onChange={(e) => setObservacoes(e.target.value)} placeholder="Opcional..." />
+                  </div>
+
+                  {/* Autorização de excesso */}
+                  {(parseCurrency(valorEntregue) > LIMITE_MAXIMO_SOLICITACAO || 
+                    (selectedSolicitacao.tipo_solicitacao === 'FUNDO_FIXO' && 
+                     parseCurrency(valorEntregue) > getSaldoEmpresa(selectedSolicitacao.empresa_id))) && (
+                    <div className="space-y-4 p-4 rounded-lg border border-warning bg-warning/5">
+                      <div className="flex items-center space-x-2">
+                        <Checkbox 
+                          id="autorizar" 
+                          checked={autorizarExcesso}
+                          onCheckedChange={(checked) => setAutorizarExcesso(!!checked)}
+                        />
+                        <Label htmlFor="autorizar" className="text-warning font-medium cursor-pointer">
+                          Autorizo exceder o limite/saldo
+                        </Label>
+                      </div>
+                      {autorizarExcesso && (
+                        <div className="space-y-2">
+                          <Label>Justificativa da Autorização *</Label>
+                          <Textarea 
+                            value={justificativaExcesso} 
+                            onChange={(e) => setJustificativaExcesso(e.target.value)}
+                            placeholder="Explique o motivo da autorização..."
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </DialogBody>
             )}
             
             <DialogFooter>
@@ -578,7 +580,7 @@ export default function AdminSolicitacoes() {
             <DialogHeader>
               <DialogTitle>Rejeitar Solicitação</DialogTitle>
             </DialogHeader>
-            <div className="space-y-4 py-4">
+            <DialogBody>
               <div className="space-y-2">
                 <Label>Motivo da Rejeição *</Label>
                 <Textarea
@@ -588,7 +590,7 @@ export default function AdminSolicitacoes() {
                   rows={4}
                 />
               </div>
-            </div>
+            </DialogBody>
             <DialogFooter>
               <Button variant="outline" onClick={() => setRejectDialogOpen(false)}>Cancelar</Button>
               <Button variant="destructive" onClick={handleReject}>Rejeitar</Button>
@@ -603,105 +605,107 @@ export default function AdminSolicitacoes() {
               <DialogTitle>Detalhes da Solicitação</DialogTitle>
             </DialogHeader>
             {selectedSolicitacao && (
-              <div className="space-y-4 py-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Tipo</p>
-                    <Badge variant={selectedSolicitacao.tipo_solicitacao === 'FUNDO_FIXO' ? 'default' : 'secondary'}>
-                      {TIPOS_SOLICITACAO_LABELS[selectedSolicitacao.tipo_solicitacao]}
-                    </Badge>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Status</p>
-                    <StatusBadge status={selectedSolicitacao.status} />
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Solicitante</p>
-                    <p className="font-medium">{selectedSolicitacao.profiles?.nome || '-'}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Empresa</p>
-                    <p className="font-medium">{selectedSolicitacao.empresas?.nome_fantasia || '-'}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Data</p>
-                    <p className="font-medium">{formatDate(selectedSolicitacao.created_at)}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Categoria</p>
-                    <p className="font-medium">{selectedSolicitacao.categoria || '-'}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Valor Solicitado</p>
-                    <p className="font-medium">{formatCurrency(selectedSolicitacao.valor_solicitado)}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Valor Entregue</p>
-                    <p className="font-medium">{selectedSolicitacao.valor_entregue ? formatCurrency(selectedSolicitacao.valor_entregue) : '-'}</p>
-                  </div>
-                  {selectedSolicitacao.data_emissao_nota && (
+              <DialogBody>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <p className="text-sm text-muted-foreground">Data Emissão Nota</p>
-                      <p className="font-medium">{formatDate(selectedSolicitacao.data_emissao_nota)}</p>
+                      <p className="text-sm text-muted-foreground">Tipo</p>
+                      <Badge variant={selectedSolicitacao.tipo_solicitacao === 'FUNDO_FIXO' ? 'default' : 'secondary'}>
+                        {TIPOS_SOLICITACAO_LABELS[selectedSolicitacao.tipo_solicitacao]}
+                      </Badge>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Status</p>
+                      <StatusBadge status={selectedSolicitacao.status} />
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Solicitante</p>
+                      <p className="font-medium">{selectedSolicitacao.profiles?.nome || '-'}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Empresa</p>
+                      <p className="font-medium">{selectedSolicitacao.empresas?.nome_fantasia || '-'}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Data</p>
+                      <p className="font-medium">{formatDate(selectedSolicitacao.created_at)}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Categoria</p>
+                      <p className="font-medium">{selectedSolicitacao.categoria || '-'}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Valor Solicitado</p>
+                      <p className="font-medium">{formatCurrency(selectedSolicitacao.valor_solicitado)}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Valor Entregue</p>
+                      <p className="font-medium">{selectedSolicitacao.valor_entregue ? formatCurrency(selectedSolicitacao.valor_entregue) : '-'}</p>
+                    </div>
+                    {selectedSolicitacao.data_emissao_nota && (
+                      <div>
+                        <p className="text-sm text-muted-foreground">Data Emissão Nota</p>
+                        <p className="font-medium">{formatDate(selectedSolicitacao.data_emissao_nota)}</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Alertas */}
+                  {(selectedSolicitacao.excedeu_saldo || selectedSolicitacao.excedeu_limite_maximo) && (
+                    <div className="flex gap-2 flex-wrap">
+                      {selectedSolicitacao.excedeu_saldo && (
+                        <Badge variant="outline" className="text-warning border-warning">
+                          Excedeu saldo do fundo
+                        </Badge>
+                      )}
+                      {selectedSolicitacao.excedeu_limite_maximo && (
+                        <Badge variant="outline" className="text-destructive border-destructive">
+                          Excedeu limite R$ 300
+                        </Badge>
+                      )}
+                    </div>
+                  )}
+
+                  <div>
+                    <p className="text-sm text-muted-foreground">Justificativa</p>
+                    <p className="mt-1">{selectedSolicitacao.justificativa}</p>
+                  </div>
+
+                  {/* Dados do Fornecedor */}
+                  {(selectedSolicitacao.nome_emitente || selectedSolicitacao.cnpj_emitente) && (
+                    <div className="pt-4 border-t border-border">
+                      <p className="text-sm font-medium mb-3">Dados do Fornecedor</p>
+                      <div className="grid grid-cols-2 gap-4">
+                        {selectedSolicitacao.nome_emitente && (
+                          <div className="col-span-2">
+                            <p className="text-sm text-muted-foreground">Nome/Razão Social</p>
+                            <p className="font-medium">{selectedSolicitacao.nome_emitente}</p>
+                          </div>
+                        )}
+                        {selectedSolicitacao.cnpj_emitente && (
+                          <div>
+                            <p className="text-sm text-muted-foreground">CNPJ</p>
+                            <p className="font-medium font-mono">
+                              {selectedSolicitacao.cnpj_emitente.replace(
+                                /^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/,
+                                '$1.$2.$3/$4-$5'
+                              )}
+                            </p>
+                          </div>
+                        )}
+                        {selectedSolicitacao.upload_nota_fiscal_url && (
+                          <div>
+                            <p className="text-sm text-muted-foreground">Nota Fiscal</p>
+                            <Badge variant="outline" className="text-success border-success">
+                              Anexada
+                            </Badge>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>
-
-                {/* Alertas */}
-                {(selectedSolicitacao.excedeu_saldo || selectedSolicitacao.excedeu_limite_maximo) && (
-                  <div className="flex gap-2">
-                    {selectedSolicitacao.excedeu_saldo && (
-                      <Badge variant="outline" className="text-warning border-warning">
-                        Excedeu saldo do fundo
-                      </Badge>
-                    )}
-                    {selectedSolicitacao.excedeu_limite_maximo && (
-                      <Badge variant="outline" className="text-destructive border-destructive">
-                        Excedeu limite R$ 300
-                      </Badge>
-                    )}
-                  </div>
-                )}
-
-                <div>
-                  <p className="text-sm text-muted-foreground">Justificativa</p>
-                  <p className="mt-1">{selectedSolicitacao.justificativa}</p>
-                </div>
-
-                {/* Dados do Fornecedor */}
-                {(selectedSolicitacao.nome_emitente || selectedSolicitacao.cnpj_emitente) && (
-                  <div className="pt-4 border-t border-border">
-                    <p className="text-sm font-medium mb-3">Dados do Fornecedor</p>
-                    <div className="grid grid-cols-2 gap-4">
-                      {selectedSolicitacao.nome_emitente && (
-                        <div className="col-span-2">
-                          <p className="text-sm text-muted-foreground">Nome/Razão Social</p>
-                          <p className="font-medium">{selectedSolicitacao.nome_emitente}</p>
-                        </div>
-                      )}
-                      {selectedSolicitacao.cnpj_emitente && (
-                        <div>
-                          <p className="text-sm text-muted-foreground">CNPJ</p>
-                          <p className="font-medium font-mono">
-                            {selectedSolicitacao.cnpj_emitente.replace(
-                              /^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/,
-                              '$1.$2.$3/$4-$5'
-                            )}
-                          </p>
-                        </div>
-                      )}
-                      {selectedSolicitacao.upload_nota_fiscal_url && (
-                        <div>
-                          <p className="text-sm text-muted-foreground">Nota Fiscal</p>
-                          <Badge variant="outline" className="text-success border-success">
-                            Anexada
-                          </Badge>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
+              </DialogBody>
             )}
           </DialogContent>
         </Dialog>

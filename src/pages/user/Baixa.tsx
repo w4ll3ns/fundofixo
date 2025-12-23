@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription, DialogBody } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { formatCurrency, maskCurrency, parseCurrency, maskCNPJ, formatDate } from '@/lib/masks';
@@ -426,36 +426,38 @@ export default function Baixa() {
               <DialogTitle>Confirmar Baixa</DialogTitle>
               <DialogDescription>Revise os dados antes de confirmar</DialogDescription>
             </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm text-muted-foreground">Valor Solicitado</p>
-                  <p className="font-medium">{formatCurrency(solicitacao.valor_solicitado)}</p>
+            <DialogBody>
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Valor Solicitado</p>
+                    <p className="font-medium">{formatCurrency(solicitacao.valor_solicitado)}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Valor Entregue</p>
+                    <p className="font-medium">{formatCurrency(solicitacao.valor_entregue)}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Valor Gasto Real</p>
+                    <p className="font-medium">{formatCurrency(valorGasto)}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">
+                      {trocoReal >= 0 ? 'Troco a Devolver' : 'Diferença a Ajustar'}
+                    </p>
+                    <p className={cn("font-bold", trocoReal < 0 ? "text-warning" : "text-success")}>
+                      {formatCurrency(Math.abs(trocoReal))}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Valor Entregue</p>
-                  <p className="font-medium">{formatCurrency(solicitacao.valor_entregue)}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Valor Gasto Real</p>
-                  <p className="font-medium">{formatCurrency(valorGasto)}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">
-                    {trocoReal >= 0 ? 'Troco a Devolver' : 'Diferença a Ajustar'}
-                  </p>
-                  <p className={cn("font-bold", trocoReal < 0 ? "text-warning" : "text-success")}>
-                    {formatCurrency(Math.abs(trocoReal))}
-                  </p>
-                </div>
+                {trocoReal < 0 && (
+                  <div className="p-3 rounded bg-warning/10 text-warning text-sm">
+                    <AlertTriangle className="inline h-4 w-4 mr-2" />
+                    O valor gasto é maior que o entregue. A solicitação ficará pendente de ajuste.
+                  </div>
+                )}
               </div>
-              {trocoReal < 0 && (
-                <div className="p-3 rounded bg-warning/10 text-warning text-sm">
-                  <AlertTriangle className="inline h-4 w-4 mr-2" />
-                  O valor gasto é maior que o entregue. A solicitação ficará pendente de ajuste.
-                </div>
-              )}
-            </div>
+            </DialogBody>
             <DialogFooter>
               <Button variant="outline" onClick={() => setConfirmDialogOpen(false)}>Voltar</Button>
               <Button onClick={handleSubmit} disabled={submitting}>
