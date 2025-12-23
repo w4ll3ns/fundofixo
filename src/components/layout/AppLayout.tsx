@@ -13,7 +13,8 @@ import {
   LogOut,
   Menu,
   X,
-  Wallet
+  Wallet,
+  ClipboardCheck
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -43,6 +44,7 @@ export function AppLayout({ children }: AppLayoutProps) {
     { icon: Wallet, label: 'Gestão de Saldo', path: '/admin/gestao-saldo' },
     { icon: Building2, label: 'Empresas', path: '/admin/empresas' },
     { icon: FileText, label: 'Solicitações', path: '/admin/solicitacoes' },
+    { icon: ClipboardCheck, label: 'Baixas Pendentes', path: '/admin/baixas-pendentes' },
     { icon: BarChart3, label: 'Relatórios', path: '/admin/relatorios' },
   ];
 
