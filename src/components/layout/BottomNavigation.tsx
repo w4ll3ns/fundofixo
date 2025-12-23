@@ -1,7 +1,7 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
-import { Home, PlusCircle, FileText, Building2, BarChart3, User, Wallet } from 'lucide-react';
+import { Home, PlusCircle, FileText, Building2, User, Wallet, Download } from 'lucide-react';
 
 export function BottomNavigation() {
   const { isAdmin } = useAuth();
@@ -17,9 +17,9 @@ export function BottomNavigation() {
   const adminItems = [
     { icon: Home, label: 'Início', path: '/admin' },
     { icon: FileText, label: 'Solicitações', path: '/admin/solicitacoes' },
+    { icon: Download, label: 'Baixas', path: '/admin/baixas-pendentes' },
     { icon: Wallet, label: 'Saldos', path: '/admin/gestao-saldo' },
     { icon: Building2, label: 'Empresas', path: '/admin/empresas' },
-    { icon: User, label: 'Perfil', path: '/perfil' },
   ];
 
   const items = isAdmin ? adminItems : userItems;
