@@ -298,6 +298,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "fk_solicitante_profile"
+            columns: ["solicitante_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
             foreignKeyName: "solicitacoes_empresa_id_fkey"
             columns: ["empresa_id"]
             isOneToOne: false
