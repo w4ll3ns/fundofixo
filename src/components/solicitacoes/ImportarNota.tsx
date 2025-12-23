@@ -1,4 +1,3 @@
-import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,54 +9,18 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { maskCurrency, parseCurrency, formatCurrency, maskCNPJ } from '@/lib/masks';
+import { maskCurrency, parseCurrency, formatCurrency } from '@/lib/masks';
 import { LIMITE_MAXIMO_SOLICITACAO } from '@/lib/constants';
-import { Loader2, AlertTriangle, Info, FileText, Upload, CheckCircle, XCircle, ArrowRight, ArrowLeft } from 'lucide-react';
+import { 
+  Loader2, AlertTriangle, Info, FileText, Upload, CheckCircle, XCircle, 
+  ArrowRight, ArrowLeft, Files 
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-interface Empresa {
-  id: string;
-  nome_fantasia: string;
-  unidade: string | null;
-}
-
-interface Fundo {
-  id: string;
-  empresa_id: string;
-  saldo_atual: number;
-}
-
-interface AIResult {
-  total_value: number | null;
-  confidence_label: 'alta' | 'media' | 'baixa';
-  evidence_text: string;
-  extracted_fields: {
-    data_emissao?: string;
-    numero_nota?: string;
-    cnpj_emitente?: string;
-    nome_emitente?: string;
-  };
-}
-
-const categorias = [
-  'Material de Escritório',
-  'Material de Limpeza',
-  'Transporte',
-  'Alimentação',
-  'Manutenção',
-  'Serviços',
-  'Outros',
-];
-
-type ImportStep = 'upload' | 'form' | 'confirm';
-
-interface DuplicataInfo {
-  id: string;
-  numero_nota: string | null;
-  nome_emitente: string | null;
-  created_at: string;
-  tipo: 'hash' | 'nota_cnpj';
-}
+import { StepIndicator } from './importar-nota/StepIndicator';
+import { NotaSelectionCard } from './importar-nota/NotaSelectionCard';
+import { useImportarNota } from './importar-nota/useImportarNota';
+import { categorias } from './importar-nota/types';
 
 interface ImportarNotaProps {
   onSuccess?: () => void;
@@ -67,317 +30,149 @@ export function ImportarNota({ onSuccess }: ImportarNotaProps) {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
-  const [empresas, setEmpresas] = useState<Empresa[]>([]);
-  const [fundos, setFundos] = useState<Fundo[]>([]);
   
-  const [step, setStep] = useState<ImportStep>('upload');
-  const [valorDisplay, setValorDisplay] = useState('');
-  
-  const [form, setForm] = useState({
-    empresa_id: '',
-    valor_solicitado: 0,
-    justificativa: '',
-    categoria: '',
-  });
+  const {
+    empresas,
+    fundos,
+    file,
+    fileUrl,
+    fileHash,
+    step,
+    uploading,
+    processing,
+    checkingDuplicate,
+    notasExtraidas,
+    notasSelecionadas,
+    duplicatasPorNota,
+    aiError,
+    sharedForm,
+    notasFormData,
+    submitting,
+    consultandoCnpj,
+    valorTotalSelecionado,
+    setStep,
+    setSharedForm,
+    setSubmitting,
+    handleFileChange,
+    toggleNotaSelecionada,
+    updateNotaFormData,
+    consultarCnpjsParaNotas,
+    resetImport,
+    getSaldoDisponivel,
+    getFundo,
+  } = useImportarNota();
 
-  const [file, setFile] = useState<File | null>(null);
-  const [fileUrl, setFileUrl] = useState<string | null>(null);
-  const [fileHash, setFileHash] = useState<string | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const [processing, setProcessing] = useState(false);
-  const [aiResult, setAiResult] = useState<AIResult | null>(null);
-  const [aiError, setAiError] = useState(false);
-  const [dataEmissao, setDataEmissao] = useState('');
-  const [numeroNota, setNumeroNota] = useState('');
-  const [nomeEmitente, setNomeEmitente] = useState('');
-  const [cnpjEmitente, setCnpjEmitente] = useState('');
-  const [descricaoCompra, setDescricaoCompra] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [duplicata, setDuplicata] = useState<DuplicataInfo | null>(null);
-  const [checkingDuplicate, setCheckingDuplicate] = useState(false);
-  const [consultandoCnpj, setConsultandoCnpj] = useState(false);
+  const hasMultipleNotas = notasExtraidas.length > 1;
+  const saldoDisponivel = getSaldoDisponivel(sharedForm.empresa_id);
+  const selectedFundo = getFundo(sharedForm.empresa_id);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      const [empresasRes, fundosRes] = await Promise.all([
-        supabase
-          .from('empresas')
-          .select('id, nome_fantasia, unidade')
-          .eq('status', true)
-          .order('nome_fantasia'),
-        supabase
-          .from('fundos')
-          .select('id, empresa_id, saldo_atual'),
-      ]);
-      
-      if (empresasRes.data) setEmpresas(empresasRes.data);
-      if (fundosRes.data) setFundos(fundosRes.data);
-    };
-
-    fetchData();
-  }, []);
-
-  const saldoDisponivel = fundos.find(f => f.empresa_id === form.empresa_id)?.saldo_atual || 0;
-  const selectedFundo = fundos.find(f => f.empresa_id === form.empresa_id);
-
-  const fileToBase64 = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = reject;
+  // Validations
+  const canProceedUpload = file && fileUrl && !uploading && !processing && 
+    !(duplicatasPorNota.get(0)?.tipo === 'hash' && notasExtraidas.length === 0);
+  const canProceedSelecao = notasSelecionadas.length > 0;
+  const canProceedForm = sharedForm.empresa_id && sharedForm.justificativa.trim().length > 0 &&
+    notasSelecionadas.every(i => {
+      const fd = notasFormData.get(i);
+      return fd && fd.valor_solicitado > 0;
     });
-  };
 
-  const calculateFileHash = async (file: File): Promise<string> => {
-    const buffer = await file.arrayBuffer();
-    const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-  };
-
-  const checkDuplicateByHash = async (hash: string): Promise<DuplicataInfo | null> => {
-    const { data } = await supabase
-      .from('solicitacoes')
-      .select('id, numero_nota, nome_emitente, created_at')
-      .eq('arquivo_hash', hash)
-      .limit(1);
-    
-    if (data && data.length > 0) {
-      return { ...data[0], tipo: 'hash' };
-    }
-    return null;
-  };
-
-  const checkDuplicateByNotaCnpj = async (numNota: string, cnpj: string): Promise<DuplicataInfo | null> => {
-    if (!numNota || !cnpj) return null;
-    
-    const cnpjLimpo = cnpj.replace(/\D/g, '');
-    const { data } = await supabase
-      .from('solicitacoes')
-      .select('id, numero_nota, nome_emitente, created_at')
-      .eq('numero_nota', numNota)
-      .eq('cnpj_emitente', cnpjLimpo)
-      .limit(1);
-    
-    if (data && data.length > 0) {
-      return { ...data[0], tipo: 'nota_cnpj' };
-    }
-    return null;
-  };
-
-  const consultarCnpjApi = async (cnpj: string): Promise<void> => {
-    if (!cnpj || cnpj.replace(/\D/g, '').length !== 14) return;
-
-    setConsultandoCnpj(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('consultar-cnpj', {
-        body: { cnpj: cnpj.replace(/\D/g, '') }
-      });
-
-      if (error) {
-        console.error('Erro ao consultar CNPJ:', error);
-        return;
-      }
-
-      if (data?.data?.razao_social) {
-        setNomeEmitente(data.data.razao_social);
-        toast({ 
-          title: 'Fornecedor identificado', 
-          description: `${data.data.razao_social}${data.source === 'cache' ? ' (cache)' : ''}` 
-        });
-      }
-    } catch (error) {
-      console.error('Erro ao consultar API de CNPJ:', error);
-      // Mantém o nome extraído pela IA em caso de erro
-    } finally {
-      setConsultandoCnpj(false);
+  const handleProceedFromUpload = () => {
+    if (notasExtraidas.length > 1) {
+      setStep('selecao');
+    } else if (notasExtraidas.length === 1) {
+      // Single nota - skip selection
+      setStep('form');
     }
   };
-
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = e.target.files?.[0];
-    if (!selectedFile) return;
-
-    const validTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'];
-    if (!validTypes.includes(selectedFile.type)) {
-      toast({ title: 'Erro', description: 'Apenas PDF, JPG ou PNG são permitidos', variant: 'destructive' });
-      return;
-    }
-
-    if (selectedFile.size > 5 * 1024 * 1024) {
-      toast({ title: 'Erro', description: 'Arquivo deve ter no máximo 5MB', variant: 'destructive' });
-      return;
-    }
-
-    setFile(selectedFile);
-    setCheckingDuplicate(true);
-    setDuplicata(null);
-    setAiResult(null);
-    setAiError(false);
-
-    try {
-      // Calcular hash do arquivo
-      const hash = await calculateFileHash(selectedFile);
-      setFileHash(hash);
-
-      // Verificar duplicata por hash
-      const duplicataHash = await checkDuplicateByHash(hash);
-      if (duplicataHash) {
-        setDuplicata(duplicataHash);
-        setCheckingDuplicate(false);
-        toast({ 
-          title: 'Arquivo já importado!', 
-          description: 'Este arquivo já foi utilizado em outra solicitação', 
-          variant: 'destructive' 
-        });
-        return;
-      }
-
-      setCheckingDuplicate(false);
-      setUploading(true);
-
-      const filePath = `${user?.id}/importados/${Date.now()}-${selectedFile.name}`;
-      
-      const { error: uploadError } = await supabase.storage
-        .from('notas-fiscais')
-        .upload(filePath, selectedFile);
-
-      if (uploadError) throw uploadError;
-
-      setFileUrl(filePath);
-      setUploading(false);
-      setProcessing(true);
-
-      const base64 = await fileToBase64(selectedFile);
-      const { data: aiData, error: aiErr } = await supabase.functions.invoke('leitor-notas', {
-        body: { 
-          file_base64: base64,
-          file_type: selectedFile.type 
-        },
-      });
-
-      if (aiErr || !aiData?.total_value) {
-        setAiError(true);
-        toast({ title: 'IA não conseguiu ler a nota', description: 'Preencha os campos manualmente', variant: 'destructive' });
-      } else {
-        const result = aiData as AIResult;
-        setAiResult(result);
-        setValorDisplay(maskCurrency(String(result.total_value! * 100)));
-        setForm({ ...form, valor_solicitado: result.total_value! });
-        if (result.extracted_fields?.data_emissao) setDataEmissao(result.extracted_fields.data_emissao);
-        if (result.extracted_fields?.numero_nota) setNumeroNota(result.extracted_fields.numero_nota);
-        if (result.extracted_fields?.nome_emitente) setNomeEmitente(result.extracted_fields.nome_emitente);
-        if (result.extracted_fields?.cnpj_emitente) setCnpjEmitente(maskCNPJ(result.extracted_fields.cnpj_emitente));
-        
-        // Consultar ReceitaWS para obter nome correto do fornecedor
-        if (result.extracted_fields?.cnpj_emitente) {
-          // Não aguarda para não bloquear o fluxo
-          consultarCnpjApi(result.extracted_fields.cnpj_emitente);
-        }
-        
-        // Verificar duplicata por número da nota + CNPJ
-        if (result.extracted_fields?.numero_nota && result.extracted_fields?.cnpj_emitente) {
-          const duplicataNota = await checkDuplicateByNotaCnpj(
-            result.extracted_fields.numero_nota, 
-            result.extracted_fields.cnpj_emitente
-          );
-          if (duplicataNota) {
-            setDuplicata(duplicataNota);
-            toast({ 
-              title: 'Possível nota duplicada', 
-              description: 'Uma nota com mesmo número e CNPJ já existe no sistema', 
-              variant: 'default' 
-            });
-          }
-        }
-        
-        toast({ title: 'Nota fiscal processada!', description: 'Campos preenchidos automaticamente' });
-      }
-    } catch (error) {
-      toast({ title: 'Erro ao processar arquivo', description: 'Tente novamente', variant: 'destructive' });
-      setAiError(true);
-    } finally {
-      setProcessing(false);
-      setCheckingDuplicate(false);
-    }
-  };
-
-  const canProceedUpload = file && fileUrl && !uploading && !processing && !(duplicata?.tipo === 'hash');
-  const canProceedForm = form.empresa_id && form.justificativa.trim().length > 0 && form.valor_solicitado > 0;
 
   const handleSubmit = async () => {
-    if (!user || !fileUrl || !form.empresa_id || !selectedFundo) return;
+    if (!user || !fileUrl || !sharedForm.empresa_id || !selectedFundo) return;
 
     setSubmitting(true);
 
     try {
       const now = new Date().toISOString();
-      const valor = form.valor_solicitado;
+      let saldoAtual = saldoDisponivel;
+      const createdIds: string[] = [];
 
-      const { data: solicitacao, error: solError } = await supabase
-        .from('solicitacoes')
-        .insert({
-          solicitante_user_id: user.id,
-          empresa_id: form.empresa_id,
-          tipo_solicitacao: 'FUNDO_FIXO',
-          valor_solicitado: valor,
-          valor_entregue: valor,
-          valor_gasto_real: valor,
-          troco_real: 0,
-          justificativa: form.justificativa,
-          categoria: form.categoria || null,
-          descricao_compra: descricaoCompra || null,
-          upload_nota_fiscal_url: fileUrl,
-          arquivo_hash: fileHash,
-          data_emissao_nota: dataEmissao || null,
-          numero_nota: numeroNota || null,
-          nome_emitente: nomeEmitente || null,
-          cnpj_emitente: cnpjEmitente.replace(/\D/g, '') || null,
-          status: 'baixada',
-          data_aprovacao: now,
-          data_baixa: now,
-          ai_valor_extraido: aiResult?.total_value || null,
-          ai_confianca: aiResult?.confidence_label || null,
-          ai_evidencia: aiResult?.evidence_text || null,
-          ai_status: aiResult ? 'ok' : (aiError ? 'falhou' : 'pendente'),
-          ai_processed_at: now,
-          excedeu_saldo: form.valor_solicitado > saldoDisponivel,
-          excedeu_limite_maximo: form.valor_solicitado > LIMITE_MAXIMO_SOLICITACAO,
-        })
-        .select('id')
-        .single();
+      for (const index of notasSelecionadas) {
+        const formData = notasFormData.get(index);
+        const nota = notasExtraidas[index];
+        if (!formData) continue;
 
-      if (solError) throw solError;
+        const valor = formData.valor_solicitado;
 
-      const novoSaldo = saldoDisponivel - valor;
+        const { data: solicitacao, error: solError } = await supabase
+          .from('solicitacoes')
+          .insert({
+            solicitante_user_id: user.id,
+            empresa_id: sharedForm.empresa_id,
+            tipo_solicitacao: 'FUNDO_FIXO',
+            valor_solicitado: valor,
+            valor_entregue: valor,
+            valor_gasto_real: valor,
+            troco_real: 0,
+            justificativa: sharedForm.justificativa,
+            categoria: formData.categoria || null,
+            descricao_compra: formData.descricaoCompra || null,
+            upload_nota_fiscal_url: fileUrl,
+            arquivo_hash: fileHash,
+            data_emissao_nota: formData.dataEmissao || null,
+            numero_nota: formData.numeroNota || null,
+            nome_emitente: formData.nomeEmitente || null,
+            cnpj_emitente: formData.cnpjEmitente.replace(/\D/g, '') || null,
+            status: 'baixada',
+            data_aprovacao: now,
+            data_baixa: now,
+            ai_valor_extraido: nota?.total_value || null,
+            ai_confianca: nota?.confidence_label || null,
+            ai_evidencia: nota?.evidence_text || null,
+            ai_status: nota ? 'ok' : 'pendente',
+            ai_processed_at: now,
+            excedeu_saldo: valor > saldoAtual,
+            excedeu_limite_maximo: valor > LIMITE_MAXIMO_SOLICITACAO,
+          })
+          .select('id')
+          .single();
+
+        if (solError) throw solError;
+
+        const novoSaldo = saldoAtual - valor;
+        
+        await supabase.from('historico_fundos').insert({
+          fundo_id: selectedFundo.id,
+          solicitacao_id: solicitacao.id,
+          tipo: 'solicitacao_retroativa',
+          valor: -valor,
+          saldo_anterior: saldoAtual,
+          saldo_posterior: novoSaldo,
+          descricao: `Importação de nota retroativa - ${formData.nomeEmitente || 'Fornecedor'} (Pág ${nota?.pagina || index + 1})`,
+        });
+
+        saldoAtual = novoSaldo;
+        createdIds.push(solicitacao.id);
+      }
+
+      // Update fundo with final balance
       await supabase.from('fundos').update({
-        saldo_atual: novoSaldo,
+        saldo_atual: saldoAtual,
       }).eq('id', selectedFundo.id);
 
-      await supabase.from('historico_fundos').insert({
-        fundo_id: selectedFundo.id,
-        solicitacao_id: solicitacao.id,
-        tipo: 'solicitacao_retroativa',
-        valor: -valor,
-        saldo_anterior: saldoDisponivel,
-        saldo_posterior: novoSaldo,
-        descricao: `Importação de nota retroativa - ${nomeEmitente || 'Fornecedor'}`,
-      });
-
       toast({ 
-        title: 'Nota importada com sucesso!', 
-        description: 'Solicitação criada e baixada automaticamente' 
+        title: `${createdIds.length} nota(s) importada(s) com sucesso!`, 
+        description: 'Solicitações criadas e baixadas automaticamente' 
       });
 
       if (onSuccess) {
         onSuccess();
+      } else if (createdIds.length === 1) {
+        navigate(`/solicitacao/${createdIds[0]}`);
       } else {
-        navigate(`/solicitacao/${solicitacao.id}`);
+        navigate('/minhas-solicitacoes?tab=lista');
       }
     } catch (error: any) {
       toast({ 
-        title: 'Erro ao importar nota', 
+        title: 'Erro ao importar notas', 
         description: error.message || 'Tente novamente', 
         variant: 'destructive' 
       });
@@ -386,28 +181,13 @@ export function ImportarNota({ onSuccess }: ImportarNotaProps) {
     }
   };
 
-  const resetImport = () => {
-    setFile(null);
-    setFileUrl(null);
-    setFileHash(null);
-    setAiResult(null);
-    setAiError(false);
-    setDuplicata(null);
-    setDataEmissao('');
-    setNumeroNota('');
-    setNomeEmitente('');
-    setCnpjEmitente('');
-    setDescricaoCompra('');
-    setValorDisplay('');
-    setForm({ empresa_id: '', justificativa: '', valor_solicitado: 0, categoria: '' });
-    setStep('upload');
-  };
-
   const handleBack = () => {
     if (step === 'upload') {
       resetImport();
-    } else if (step === 'form') {
+    } else if (step === 'selecao') {
       setStep('upload');
+    } else if (step === 'form') {
+      setStep(hasMultipleNotas ? 'selecao' : 'upload');
     } else if (step === 'confirm') {
       setStep('form');
     }
@@ -418,34 +198,19 @@ export function ImportarNota({ onSuccess }: ImportarNotaProps) {
       <CardHeader>
         <CardTitle>Importar Nota Fiscal</CardTitle>
         <CardDescription>
-          Importe uma nota fiscal para criar automaticamente a solicitação e baixa
+          Importe notas fiscais para criar automaticamente as solicitações e baixas
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
-        {/* Step Indicator */}
-        <div className="flex items-center justify-center gap-2 py-2">
-          <div className={cn(
-            "w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium",
-            step === 'upload' || step === 'form' || step === 'confirm' ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
-          )}>1</div>
-          <div className={cn("w-8 h-0.5", step === 'form' || step === 'confirm' ? "bg-primary" : "bg-muted")} />
-          <div className={cn(
-            "w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium",
-            step === 'form' || step === 'confirm' ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
-          )}>2</div>
-          <div className={cn("w-8 h-0.5", step === 'confirm' ? "bg-primary" : "bg-muted")} />
-          <div className={cn(
-            "w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium",
-            step === 'confirm' ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
-          )}>3</div>
-        </div>
+        <StepIndicator currentStep={step} hasMultipleNotas={hasMultipleNotas} />
 
         {/* Step 1: Upload */}
         {step === 'upload' && (
           <div className="space-y-4">
             <div className={cn(
               "border-2 border-dashed rounded-lg p-8 text-center transition-colors",
-              duplicata?.tipo === 'hash' ? "border-destructive bg-destructive/5" :
+              duplicatasPorNota.get(0)?.tipo === 'hash' && notasExtraidas.length === 0 
+                ? "border-destructive bg-destructive/5" :
               file ? "border-success bg-success/5" : "border-border hover:border-primary/50"
             )}>
               {checkingDuplicate ? (
@@ -457,13 +222,25 @@ export function ImportarNota({ onSuccess }: ImportarNotaProps) {
                 <div className="flex flex-col items-center gap-2">
                   <Loader2 className="h-10 w-10 animate-spin text-primary" />
                   <p className="text-sm text-muted-foreground">
-                    {uploading ? 'Enviando arquivo...' : 'Processando nota com IA...'}
+                    {uploading ? 'Enviando arquivo...' : 'Processando nota(s) com IA...'}
                   </p>
                 </div>
               ) : file ? (
                 <div className="flex flex-col items-center gap-2">
-                  <FileText className={cn("h-10 w-10", duplicata?.tipo === 'hash' ? "text-destructive" : "text-success")} />
+                  {notasExtraidas.length > 1 ? (
+                    <Files className="h-10 w-10 text-success" />
+                  ) : (
+                    <FileText className={cn(
+                      "h-10 w-10", 
+                      duplicatasPorNota.get(0)?.tipo === 'hash' ? "text-destructive" : "text-success"
+                    )} />
+                  )}
                   <p className="font-medium">{file.name}</p>
+                  {notasExtraidas.length > 1 && (
+                    <p className="text-sm text-success font-medium">
+                      {notasExtraidas.length} notas fiscais encontradas
+                    </p>
+                  )}
                   <Button variant="ghost" size="sm" onClick={() => document.getElementById('import-file-input')?.click()}>
                     Trocar arquivo
                   </Button>
@@ -472,7 +249,8 @@ export function ImportarNota({ onSuccess }: ImportarNotaProps) {
                 <label htmlFor="import-file-input" className="cursor-pointer">
                   <Upload className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
                   <p className="font-medium">Clique para enviar a nota fiscal</p>
-                  <p className="text-sm text-muted-foreground mt-1">PDF, JPG ou PNG até 5MB</p>
+                  <p className="text-sm text-muted-foreground mt-1">PDF, JPG ou PNG até 10MB</p>
+                  <p className="text-xs text-muted-foreground mt-1">PDFs com múltiplas páginas são suportados</p>
                 </label>
               )}
               <input
@@ -484,21 +262,20 @@ export function ImportarNota({ onSuccess }: ImportarNotaProps) {
               />
             </div>
 
-            {/* Alerta de duplicata por hash (bloqueia) */}
-            {duplicata?.tipo === 'hash' && (
+            {/* Alerta de duplicata por hash (arquivo inteiro) */}
+            {duplicatasPorNota.get(0)?.tipo === 'hash' && notasExtraidas.length === 0 && (
               <div className="p-4 rounded-lg bg-destructive/10 flex items-start gap-3">
                 <XCircle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
                 <div className="flex-1">
                   <p className="font-medium text-destructive">Este arquivo já foi importado!</p>
                   <p className="text-sm text-muted-foreground mt-1">
-                    {duplicata.nome_emitente && `Emitente: ${duplicata.nome_emitente}`}
-                    {duplicata.numero_nota && ` • Nota: ${duplicata.numero_nota}`}
-                    {duplicata.created_at && ` • Em: ${new Date(duplicata.created_at).toLocaleDateString('pt-BR')}`}
+                    {duplicatasPorNota.get(0)?.nome_emitente && `Emitente: ${duplicatasPorNota.get(0)?.nome_emitente}`}
+                    {duplicatasPorNota.get(0)?.numero_nota && ` • Nota: ${duplicatasPorNota.get(0)?.numero_nota}`}
                   </p>
                   <Button 
                     variant="link" 
                     className="p-0 h-auto text-primary" 
-                    onClick={() => navigate(`/solicitacao/${duplicata.id}`)}
+                    onClick={() => navigate(`/solicitacao/${duplicatasPorNota.get(0)?.id}`)}
                   >
                     Ver solicitação existente →
                   </Button>
@@ -506,47 +283,19 @@ export function ImportarNota({ onSuccess }: ImportarNotaProps) {
               </div>
             )}
 
-            {/* Alerta de duplicata por nota+cnpj (avisa mas permite) */}
-            {duplicata?.tipo === 'nota_cnpj' && (
-              <div className="p-4 rounded-lg bg-warning/10 flex items-start gap-3">
-                <AlertTriangle className="h-5 w-5 text-warning flex-shrink-0 mt-0.5" />
-                <div className="flex-1">
-                  <p className="font-medium text-warning">Possível nota duplicada</p>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Uma nota com mesmo número e CNPJ já existe no sistema.
-                    {duplicata.nome_emitente && ` Emitente: ${duplicata.nome_emitente}`}
-                    {duplicata.created_at && ` • Em: ${new Date(duplicata.created_at).toLocaleDateString('pt-BR')}`}
-                  </p>
-                  <Button 
-                    variant="link" 
-                    className="p-0 h-auto text-primary" 
-                    onClick={() => navigate(`/solicitacao/${duplicata.id}`)}
-                  >
-                    Ver solicitação existente →
-                  </Button>
-                </div>
-              </div>
-            )}
-
-            {aiResult && (
+            {/* Result summary */}
+            {notasExtraidas.length > 0 && (
               <div className={cn(
                 "p-4 rounded-lg flex items-start gap-3",
-                aiResult.confidence_label === 'alta' ? "bg-success/10" :
-                aiResult.confidence_label === 'media' ? "bg-warning/10" : "bg-destructive/10"
+                "bg-success/10"
               )}>
-                {aiResult.confidence_label === 'alta' ? (
-                  <CheckCircle className="h-5 w-5 text-success flex-shrink-0" />
-                ) : aiResult.confidence_label === 'media' ? (
-                  <AlertTriangle className="h-5 w-5 text-warning flex-shrink-0" />
-                ) : (
-                  <XCircle className="h-5 w-5 text-destructive flex-shrink-0" />
-                )}
+                <CheckCircle className="h-5 w-5 text-success flex-shrink-0" />
                 <div>
                   <p className="font-medium">
-                    Confiança {aiResult.confidence_label === 'alta' ? 'Alta' : aiResult.confidence_label === 'media' ? 'Média' : 'Baixa'}
+                    {notasExtraidas.length} nota(s) fiscal(is) identificada(s)
                   </p>
                   <p className="text-sm text-muted-foreground mt-1">
-                    Valor encontrado: {formatCurrency(aiResult.total_value || 0)}
+                    Valor total: {formatCurrency(notasExtraidas.reduce((sum, n) => sum + (n.total_value || 0), 0))}
                   </p>
                 </div>
               </div>
@@ -556,128 +305,241 @@ export function ImportarNota({ onSuccess }: ImportarNotaProps) {
               <div className="p-4 rounded-lg bg-destructive/10 flex items-start gap-3">
                 <XCircle className="h-5 w-5 text-destructive flex-shrink-0" />
                 <div>
-                  <p className="font-medium">Não foi possível ler a nota automaticamente</p>
-                  <p className="text-sm text-muted-foreground">Você precisará preencher os campos manualmente</p>
+                  <p className="font-medium">Não foi possível ler o documento</p>
+                  <p className="text-sm text-muted-foreground">Verifique se o arquivo contém notas fiscais legíveis</p>
                 </div>
               </div>
             )}
 
             <Button 
-              onClick={() => setStep('form')} 
-              disabled={!canProceedUpload}
+              onClick={handleProceedFromUpload} 
+              disabled={!canProceedUpload || notasExtraidas.length === 0}
               className="w-full"
             >
-              Continuar
+              {notasExtraidas.length > 1 ? 'Selecionar Notas' : 'Continuar'}
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
           </div>
         )}
 
-        {/* Step 2: Form */}
-        {step === 'form' && (
+        {/* Step 2: Selection (only for multiple notas) */}
+        {step === 'selecao' && (
           <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Empresa / Fundo Fixo *</Label>
-              <Select value={form.empresa_id} onValueChange={(value) => setForm({ ...form, empresa_id: value })}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione a empresa" />
-                </SelectTrigger>
-                <SelectContent>
-                  {empresas.map((emp) => {
-                    const fundo = fundos.find(f => f.empresa_id === emp.id);
-                    return (
-                      <SelectItem key={emp.id} value={emp.id}>
-                        {emp.nome_fantasia} {emp.unidade ? `(${emp.unidade})` : ''} 
-                        {fundo && ` - Saldo: ${formatCurrency(fundo.saldo_atual)}`}
-                      </SelectItem>
-                    );
-                  })}
-                </SelectContent>
-              </Select>
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-muted-foreground">
+                Selecione as notas que deseja importar:
+              </p>
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={() => {
+                  const allIndices = notasExtraidas.map((_, i) => i)
+                    .filter(i => duplicatasPorNota.get(i)?.tipo !== 'hash');
+                  if (notasSelecionadas.length === allIndices.length) {
+                    // Deselect all
+                    for (const i of allIndices) toggleNotaSelecionada(i);
+                  } else {
+                    // Select all
+                    for (const i of allIndices) {
+                      if (!notasSelecionadas.includes(i)) toggleNotaSelecionada(i);
+                    }
+                  }
+                }}
+              >
+                {notasSelecionadas.length === notasExtraidas.filter((_, i) => duplicatasPorNota.get(i)?.tipo !== 'hash').length 
+                  ? 'Desmarcar Todas' : 'Selecionar Todas'}
+              </Button>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label>Valor da Nota *</Label>
-                <Input
-                  value={valorDisplay}
-                  onChange={(e) => {
-                    const masked = maskCurrency(e.target.value);
-                    setValorDisplay(masked);
-                    setForm({ ...form, valor_solicitado: parseCurrency(masked) });
-                  }}
-                  placeholder="R$ 0,00"
+            <div className="space-y-3 max-h-[400px] overflow-y-auto">
+              {notasExtraidas.map((nota, index) => (
+                <NotaSelectionCard
+                  key={index}
+                  nota={nota}
+                  index={index}
+                  selected={notasSelecionadas.includes(index)}
+                  onToggle={() => toggleNotaSelecionada(index)}
+                  duplicata={duplicatasPorNota.get(index)}
                 />
-              </div>
+              ))}
+            </div>
+
+            <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+              <span className="text-sm">
+                {notasSelecionadas.length} de {notasExtraidas.length} selecionada(s)
+              </span>
+              <span className="font-medium">
+                Total: {formatCurrency(notasSelecionadas.reduce((sum, i) => sum + (notasExtraidas[i]?.total_value || 0), 0))}
+              </span>
+            </div>
+
+            <div className="flex gap-4">
+              <Button variant="outline" onClick={handleBack} className="flex-1">
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Voltar
+              </Button>
+              <Button 
+                onClick={() => {
+                  consultarCnpjsParaNotas();
+                  setStep('form');
+                }} 
+                disabled={!canProceedSelecao}
+                className="flex-1"
+              >
+                Continuar
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 3: Form */}
+        {step === 'form' && (
+          <div className="space-y-4">
+            {/* Shared fields */}
+            <div className="p-4 rounded-lg border border-border bg-muted/30 space-y-4">
+              <p className="text-sm font-medium">Dados comuns a todas as notas:</p>
+              
               <div className="space-y-2">
-                <Label>Categoria</Label>
-                <Select value={form.categoria} onValueChange={(value) => setForm({ ...form, categoria: value })}>
+                <Label>Empresa / Fundo Fixo *</Label>
+                <Select 
+                  value={sharedForm.empresa_id} 
+                  onValueChange={(value) => setSharedForm({ ...sharedForm, empresa_id: value })}
+                >
                   <SelectTrigger>
-                    <SelectValue placeholder="Selecione" />
+                    <SelectValue placeholder="Selecione a empresa" />
                   </SelectTrigger>
                   <SelectContent>
-                    {categorias.map((cat) => (
-                      <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                    ))}
+                    {empresas.map((emp) => {
+                      const fundo = fundos.find(f => f.empresa_id === emp.id);
+                      return (
+                        <SelectItem key={emp.id} value={emp.id}>
+                          {emp.nome_fantasia} {emp.unidade ? `(${emp.unidade})` : ''} 
+                          {fundo && ` - Saldo: ${formatCurrency(fundo.saldo_atual)}`}
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
               </div>
-            </div>
 
-            <div className="space-y-2">
-              <Label>Justificativa *</Label>
-              <Textarea
-                value={form.justificativa}
-                onChange={(e) => setForm({ ...form, justificativa: e.target.value })}
-                placeholder="Descreva o motivo da compra..."
-                rows={3}
-              />
-            </div>
-
-            {/* Dados do Fornecedor */}
-            {(nomeEmitente || cnpjEmitente) && (
-              <div className="p-3 rounded-lg border border-border bg-muted/30 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Fornecedor</span>
-                  {consultandoCnpj && (
-                    <span className="text-xs text-muted-foreground flex items-center gap-1">
-                      <Loader2 className="h-3 w-3 animate-spin" />
-                      Consultando CNPJ...
-                    </span>
-                  )}
-                </div>
-                <div className="space-y-2">
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Nome/Razão Social</Label>
-                    <Input
-                      value={nomeEmitente}
-                      onChange={(e) => setNomeEmitente(e.target.value)}
-                      placeholder="Nome do fornecedor"
-                    />
-                  </div>
-                  {cnpjEmitente && (
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <span>CNPJ:</span>
-                      <span className="font-mono">{cnpjEmitente}</span>
-                    </div>
-                  )}
-                </div>
+              <div className="space-y-2">
+                <Label>Justificativa *</Label>
+                <Textarea
+                  value={sharedForm.justificativa}
+                  onChange={(e) => setSharedForm({ ...sharedForm, justificativa: e.target.value })}
+                  placeholder="Descreva o motivo das compras..."
+                  rows={3}
+                />
               </div>
-            )}
-
-            <div className="space-y-2">
-              <Label>Descrição da Compra</Label>
-              <Input
-                value={descricaoCompra}
-                onChange={(e) => setDescricaoCompra(e.target.value)}
-                placeholder="O que foi comprado?"
-              />
             </div>
 
-            {form.valor_solicitado > saldoDisponivel && form.empresa_id && (
+            {/* Individual nota forms */}
+            <div className="space-y-4">
+              <p className="text-sm font-medium">Dados de cada nota:</p>
+              
+              {notasSelecionadas.map((index) => {
+                const nota = notasExtraidas[index];
+                const formData = notasFormData.get(index);
+                if (!formData) return null;
+
+                return (
+                  <div key={index} className="p-4 rounded-lg border border-border space-y-4">
+                    <div className="flex items-center gap-2">
+                      <FileText className="h-4 w-4 text-muted-foreground" />
+                      <span className="font-medium">Página {nota.pagina}</span>
+                      {nota.confidence_label === 'alta' ? (
+                        <CheckCircle className="h-4 w-4 text-success" />
+                      ) : nota.confidence_label === 'media' ? (
+                        <AlertTriangle className="h-4 w-4 text-warning" />
+                      ) : (
+                        <XCircle className="h-4 w-4 text-destructive" />
+                      )}
+                    </div>
+
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label>Valor da Nota *</Label>
+                        <Input
+                          value={formData.valorDisplay}
+                          onChange={(e) => {
+                            const masked = maskCurrency(e.target.value);
+                            updateNotaFormData(index, {
+                              valorDisplay: masked,
+                              valor_solicitado: parseCurrency(masked),
+                            });
+                          }}
+                          placeholder="R$ 0,00"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Categoria</Label>
+                        <Select 
+                          value={formData.categoria} 
+                          onValueChange={(value) => updateNotaFormData(index, { categoria: value })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {categorias.map((cat) => (
+                              <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    {/* Fornecedor */}
+                    {(formData.nomeEmitente || formData.cnpjEmitente) && (
+                      <div className="p-3 rounded-lg border border-border bg-muted/30 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium">Fornecedor</span>
+                          {consultandoCnpj && (
+                            <span className="text-xs text-muted-foreground flex items-center gap-1">
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                              Consultando CNPJ...
+                            </span>
+                          )}
+                        </div>
+                        <div className="space-y-2">
+                          <div className="space-y-1">
+                            <Label className="text-xs text-muted-foreground">Nome/Razão Social</Label>
+                            <Input
+                              value={formData.nomeEmitente}
+                              onChange={(e) => updateNotaFormData(index, { nomeEmitente: e.target.value })}
+                              placeholder="Nome do fornecedor"
+                            />
+                          </div>
+                          {formData.cnpjEmitente && (
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                              <span>CNPJ:</span>
+                              <span className="font-mono">{formData.cnpjEmitente}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="space-y-2">
+                      <Label>Descrição da Compra</Label>
+                      <Input
+                        value={formData.descricaoCompra}
+                        onChange={(e) => updateNotaFormData(index, { descricaoCompra: e.target.value })}
+                        placeholder="O que foi comprado?"
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {valorTotalSelecionado > saldoDisponivel && sharedForm.empresa_id && (
               <div className="p-3 rounded-lg bg-warning/10 text-warning text-sm flex items-center gap-2">
                 <AlertTriangle className="h-4 w-4" />
-                <span>Valor excede o saldo disponível ({formatCurrency(saldoDisponivel)})</span>
+                <span>
+                  Valor total ({formatCurrency(valorTotalSelecionado)}) excede o saldo disponível ({formatCurrency(saldoDisponivel)})
+                </span>
               </div>
             )}
 
@@ -698,45 +560,52 @@ export function ImportarNota({ onSuccess }: ImportarNotaProps) {
           </div>
         )}
 
-        {/* Step 3: Confirm */}
+        {/* Step 4: Confirm */}
         {step === 'confirm' && (
           <div className="space-y-4">
             <div className="p-4 rounded-lg bg-muted/50 space-y-3">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Empresa:</span>
-                <span className="font-medium">{empresas.find(e => e.id === form.empresa_id)?.nome_fantasia}</span>
+                <span className="font-medium">{empresas.find(e => e.id === sharedForm.empresa_id)?.nome_fantasia}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Valor:</span>
-                <span className="font-medium">{formatCurrency(form.valor_solicitado)}</span>
+                <span className="text-muted-foreground">Notas a importar:</span>
+                <span className="font-medium">{notasSelecionadas.length}</span>
               </div>
-              {form.categoria && (
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Categoria:</span>
-                  <span className="font-medium">{form.categoria}</span>
-                </div>
-              )}
-              {nomeEmitente && (
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Emitente:</span>
-                  <span className="font-medium">{nomeEmitente}</span>
-                </div>
-              )}
-              {numeroNota && (
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Nº Nota:</span>
-                  <span className="font-medium">{numeroNota}</span>
-                </div>
-              )}
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Valor total:</span>
+                <span className="font-medium">{formatCurrency(valorTotalSelecionado)}</span>
+              </div>
               <div className="pt-2 border-t border-border">
-                <p className="text-sm">{form.justificativa}</p>
+                <p className="text-sm">{sharedForm.justificativa}</p>
               </div>
+            </div>
+
+            {/* Detail per nota */}
+            <div className="space-y-2">
+              {notasSelecionadas.map((index) => {
+                const nota = notasExtraidas[index];
+                const formData = notasFormData.get(index);
+                if (!formData) return null;
+
+                return (
+                  <div key={index} className="p-3 rounded-lg border border-border text-sm">
+                    <div className="flex justify-between items-center">
+                      <span className="text-muted-foreground">Pág {nota.pagina}</span>
+                      <span className="font-medium">{formatCurrency(formData.valor_solicitado)}</span>
+                    </div>
+                    {formData.nomeEmitente && (
+                      <p className="text-muted-foreground truncate">{formData.nomeEmitente}</p>
+                    )}
+                  </div>
+                );
+              })}
             </div>
 
             <Alert>
               <Info className="h-4 w-4" />
               <AlertDescription>
-                Ao confirmar, a solicitação será criada com status <strong>baixada</strong> e o valor será debitado do saldo do fundo fixo.
+                Ao confirmar, {notasSelecionadas.length > 1 ? 'as solicitações serão criadas' : 'a solicitação será criada'} com status <strong>baixada</strong> e o valor total será debitado do saldo do fundo fixo.
               </AlertDescription>
             </Alert>
 
