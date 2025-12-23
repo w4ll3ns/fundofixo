@@ -41,8 +41,12 @@ function AppRoutes() {
       <Route path="/auth" element={user ? <Navigate to={isAdmin ? "/admin" : "/dashboard"} /> : <Auth />} />
       <Route path="/" element={<Navigate to={user ? (isAdmin ? "/admin" : "/dashboard") : "/auth"} />} />
       
-      {/* User routes */}
-      <Route path="/dashboard" element={<ProtectedRoute><UserDashboard /></ProtectedRoute>} />
+      {/* User routes - admin is redirected to /admin */}
+      <Route path="/dashboard" element={
+        <ProtectedRoute>
+          {isAdmin ? <Navigate to="/admin" replace /> : <UserDashboard />}
+        </ProtectedRoute>
+      } />
       <Route path="/nova-solicitacao" element={<ProtectedRoute><NovaSolicitacao /></ProtectedRoute>} />
       <Route path="/minhas-solicitacoes" element={<ProtectedRoute><MinhasSolicitacoes /></ProtectedRoute>} />
       <Route path="/solicitacao/:id" element={<ProtectedRoute><DetalhesSolicitacao /></ProtectedRoute>} />
