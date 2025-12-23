@@ -198,6 +198,7 @@ export type Database = {
           ai_processed_at: string | null
           ai_status: Database["public"]["Enums"]["ai_status"] | null
           ai_valor_extraido: number | null
+          arquivo_hash: string | null
           categoria: string | null
           cnpj_emitente: string | null
           created_at: string
@@ -233,6 +234,7 @@ export type Database = {
           ai_processed_at?: string | null
           ai_status?: Database["public"]["Enums"]["ai_status"] | null
           ai_valor_extraido?: number | null
+          arquivo_hash?: string | null
           categoria?: string | null
           cnpj_emitente?: string | null
           created_at?: string
@@ -268,6 +270,7 @@ export type Database = {
           ai_processed_at?: string | null
           ai_status?: Database["public"]["Enums"]["ai_status"] | null
           ai_valor_extraido?: number | null
+          arquivo_hash?: string | null
           categoria?: string | null
           cnpj_emitente?: string | null
           created_at?: string
