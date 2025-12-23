@@ -9,6 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatCurrency, formatDate } from '@/lib/masks';
 import { Search, Eye } from 'lucide-react';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 type StatusType = 'enviada' | 'aprovada' | 'entregue' | 'rejeitada' | 'baixada' | 'pendente_ajuste';
 
@@ -29,6 +30,7 @@ interface ListaSolicitacoesProps {
 
 export function ListaSolicitacoes({ defaultStatusFilter }: ListaSolicitacoesProps) {
   const { user } = useAuth();
+  const isMobile = useIsMobile();
   const [searchParams, setSearchParams] = useSearchParams();
   const [solicitacoes, setSolicitacoes] = useState<Solicitacao[]>([]);
   const [loading, setLoading] = useState(true);
@@ -108,7 +110,54 @@ export function ListaSolicitacoes({ defaultStatusFilter }: ListaSolicitacoesProp
           <div className="p-8 text-center text-muted-foreground">Carregando...</div>
         ) : filtered.length === 0 ? (
           <div className="p-8 text-center text-muted-foreground">Nenhuma solicitação encontrada</div>
+        ) : isMobile ? (
+          // Mobile: Cards
+          <div className="divide-y divide-border">
+            {filtered.map((sol) => (
+              <div key={sol.id} className="p-4 space-y-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium truncate">{sol.empresas?.nome_fantasia}</p>
+                    <p className="text-xs text-muted-foreground">{formatDate(sol.created_at)}</p>
+                  </div>
+                  <StatusBadge status={sol.status} />
+                </div>
+                
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div>
+                    <p className="text-muted-foreground">Solicitado</p>
+                    <p className="font-medium">{formatCurrency(sol.valor_solicitado)}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">Entregue</p>
+                    <p className="font-medium">{sol.valor_entregue ? formatCurrency(sol.valor_entregue) : '-'}</p>
+                  </div>
+                </div>
+                
+                {sol.data_emissao_nota && (
+                  <div className="text-sm text-muted-foreground">
+                    Nota: {formatDate(sol.data_emissao_nota)}
+                  </div>
+                )}
+                
+                <div className="flex gap-2 pt-2">
+                  {(sol.status === 'entregue' || sol.status === 'pendente_ajuste') && (
+                    <Button size="sm" className="flex-1 h-10" asChild>
+                      <Link to={`/baixa/${sol.id}`}>Fazer Baixa</Link>
+                    </Button>
+                  )}
+                  <Button size="sm" variant="outline" className="flex-1 h-10" asChild>
+                    <Link to={`/solicitacao/${sol.id}`}>
+                      <Eye className="h-4 w-4 mr-2" />
+                      Ver Detalhes
+                    </Link>
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
         ) : (
+          // Desktop: Table
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-muted/50">

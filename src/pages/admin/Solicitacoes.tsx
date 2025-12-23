@@ -17,6 +17,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { formatCurrency, formatDate, maskCurrency, parseCurrency } from '@/lib/masks';
 import { LIMITE_MAXIMO_SOLICITACAO, TIPOS_SOLICITACAO_LABELS, TipoSolicitacao } from '@/lib/constants';
 import { Search, Check, X, Eye, AlertTriangle, Wallet } from 'lucide-react';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 type StatusType = 'enviada' | 'aprovada' | 'entregue' | 'rejeitada' | 'baixada' | 'pendente_ajuste';
 
@@ -50,6 +51,7 @@ interface Fundo {
 export default function AdminSolicitacoes() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const isMobile = useIsMobile();
   const [solicitacoes, setSolicitacoes] = useState<Solicitacao[]>([]);
   const [fundos, setFundos] = useState<Fundo[]>([]);
   const [loading, setLoading] = useState(true);
@@ -315,7 +317,87 @@ export default function AdminSolicitacoes() {
             <div className="p-8 text-center text-muted-foreground">Carregando...</div>
           ) : filtered.length === 0 ? (
             <div className="p-8 text-center text-muted-foreground">Nenhuma solicitação encontrada</div>
+          ) : isMobile ? (
+            // Mobile: Cards
+            <div className="divide-y divide-border">
+              {filtered.map((sol) => (
+                <div key={sol.id} className="p-4 space-y-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium truncate">{sol.profiles?.nome || '-'}</p>
+                      <p className="text-sm text-muted-foreground truncate">{sol.empresas?.nome_fantasia || '-'}</p>
+                    </div>
+                    <StatusBadge status={sol.status} />
+                  </div>
+                  
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Badge variant={sol.tipo_solicitacao === 'FUNDO_FIXO' ? 'default' : 'secondary'} className="text-xs">
+                      {TIPOS_SOLICITACAO_LABELS[sol.tipo_solicitacao] || sol.tipo_solicitacao}
+                    </Badge>
+                    {sol.excedeu_saldo && (
+                      <Badge variant="outline" className="text-warning border-warning text-xs">
+                        <Wallet className="h-3 w-3 mr-1" /> Saldo
+                      </Badge>
+                    )}
+                    {sol.excedeu_limite_maximo && (
+                      <Badge variant="outline" className="text-destructive border-destructive text-xs">
+                        <AlertTriangle className="h-3 w-3 mr-1" /> R$300
+                      </Badge>
+                    )}
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div>
+                      <p className="text-muted-foreground">Solicitado</p>
+                      <p className="font-medium">{formatCurrency(sol.valor_solicitado)}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Entregue</p>
+                      <p className="font-medium">{sol.valor_entregue ? formatCurrency(sol.valor_entregue) : '-'}</p>
+                    </div>
+                  </div>
+                  
+                  <div className="text-xs text-muted-foreground">
+                    {formatDate(sol.created_at)}
+                    {sol.data_emissao_nota && ` • Nota: ${formatDate(sol.data_emissao_nota)}`}
+                  </div>
+                  
+                  <div className="flex gap-2 pt-2">
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      className="flex-1 h-10"
+                      onClick={() => openDetail(sol)}
+                    >
+                      <Eye className="h-4 w-4 mr-2" />
+                      Ver
+                    </Button>
+                    {sol.status === 'enviada' && (
+                      <>
+                        <Button 
+                          size="sm" 
+                          variant="default"
+                          className="h-10 px-4"
+                          onClick={() => openApprove(sol)}
+                        >
+                          <Check className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="destructive"
+                          className="h-10 px-4"
+                          onClick={() => openReject(sol)}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
           ) : (
+            // Desktop: Table
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-muted/50">
