@@ -33,8 +33,7 @@ export function AppLayout({ children }: AppLayoutProps) {
 
   const userMenuItems = [
     { icon: Home, label: 'Dashboard', path: '/dashboard' },
-    { icon: PlusCircle, label: 'Nova Solicitação', path: '/nova-solicitacao' },
-    { icon: FileText, label: 'Minhas Solicitações', path: '/minhas-solicitacoes' },
+    { icon: FileText, label: 'Solicitações', path: '/minhas-solicitacoes' },
   ];
 
   const adminMenuItems = [
@@ -44,9 +43,8 @@ export function AppLayout({ children }: AppLayoutProps) {
     { icon: FileText, label: 'Solicitações', path: '/admin/solicitacoes' },
     { icon: ClipboardCheck, label: 'Baixas Pendentes', path: '/admin/baixas-pendentes' },
     { icon: BarChart3, label: 'Relatórios', path: '/admin/relatorios' },
-    // Admin's own requests
-    { icon: PlusCircle, label: 'Minha Solicitação', path: '/nova-solicitacao' },
-    { icon: FileText, label: 'Minhas Solicitações', path: '/minhas-solicitacoes' },
+    // Admin's own requests - unified page
+    { icon: PlusCircle, label: 'Minhas Solicitações', path: '/minhas-solicitacoes' },
   ];
 
   const menuItems = isAdmin ? adminMenuItems : userMenuItems;
