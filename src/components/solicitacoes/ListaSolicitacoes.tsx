@@ -19,6 +19,7 @@ interface Solicitacao {
   status: StatusType;
   created_at: string;
   justificativa: string;
+  data_emissao_nota: string | null;
   empresas: { nome_fantasia: string } | null;
 }
 
@@ -40,7 +41,7 @@ export function ListaSolicitacoes({ defaultStatusFilter }: ListaSolicitacoesProp
     const fetchSolicitacoes = async () => {
       let query = supabase
         .from('solicitacoes')
-        .select('id, valor_solicitado, valor_entregue, status, created_at, justificativa, empresas(nome_fantasia)')
+        .select('id, valor_solicitado, valor_entregue, status, created_at, justificativa, data_emissao_nota, empresas(nome_fantasia)')
         .eq('solicitante_user_id', user.id)
         .order('created_at', { ascending: false });
 
@@ -116,6 +117,7 @@ export function ListaSolicitacoes({ defaultStatusFilter }: ListaSolicitacoesProp
                   <th className="text-left py-3 px-4 text-sm font-medium">Empresa</th>
                   <th className="text-left py-3 px-4 text-sm font-medium">Solicitado</th>
                   <th className="text-left py-3 px-4 text-sm font-medium">Entregue</th>
+                  <th className="text-left py-3 px-4 text-sm font-medium">Data Nota</th>
                   <th className="text-left py-3 px-4 text-sm font-medium">Status</th>
                   <th className="text-left py-3 px-4 text-sm font-medium">Ações</th>
                 </tr>
@@ -127,6 +129,7 @@ export function ListaSolicitacoes({ defaultStatusFilter }: ListaSolicitacoesProp
                     <td className="py-3 px-4 text-sm">{sol.empresas?.nome_fantasia}</td>
                     <td className="py-3 px-4 text-sm font-medium">{formatCurrency(sol.valor_solicitado)}</td>
                     <td className="py-3 px-4 text-sm">{sol.valor_entregue ? formatCurrency(sol.valor_entregue) : '-'}</td>
+                    <td className="py-3 px-4 text-sm">{sol.data_emissao_nota ? formatDate(sol.data_emissao_nota) : '-'}</td>
                     <td className="py-3 px-4"><StatusBadge status={sol.status} /></td>
                     <td className="py-3 px-4">
                       <div className="flex gap-2">

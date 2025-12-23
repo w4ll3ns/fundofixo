@@ -38,6 +38,7 @@ interface Solicitacao {
   nome_emitente: string | null;
   cnpj_emitente: string | null;
   upload_nota_fiscal_url: string | null;
+  data_emissao_nota: string | null;
 }
 
 interface Fundo {
@@ -53,6 +54,7 @@ export default function AdminSolicitacoes() {
   const [fundos, setFundos] = useState<Fundo[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [mesCompetencia, setMesCompetencia] = useState<string>('all');
   const [search, setSearch] = useState('');
   
   const [approveDialogOpen, setApproveDialogOpen] = useState(false);
@@ -69,7 +71,7 @@ export default function AdminSolicitacoes() {
   const fetchData = async () => {
     let query = supabase
       .from('solicitacoes')
-      .select('id, valor_solicitado, valor_entregue, status, created_at, justificativa, categoria, tipo_solicitacao, excedeu_saldo, excedeu_limite_maximo, empresa_id, solicitante_user_id, nome_emitente, cnpj_emitente, upload_nota_fiscal_url, empresas(nome_fantasia), profiles:solicitante_user_id(nome)')
+      .select('id, valor_solicitado, valor_entregue, status, created_at, justificativa, categoria, tipo_solicitacao, excedeu_saldo, excedeu_limite_maximo, empresa_id, solicitante_user_id, nome_emitente, cnpj_emitente, upload_nota_fiscal_url, data_emissao_nota, empresas(nome_fantasia), profiles:solicitante_user_id(nome)')
       .order('created_at', { ascending: false });
 
     if (statusFilter !== 'all') {
@@ -238,10 +240,33 @@ export default function AdminSolicitacoes() {
     fetchData();
   };
 
-  const filtered = solicitacoes.filter(s =>
-    s.empresas?.nome_fantasia.toLowerCase().includes(search.toLowerCase()) ||
-    s.profiles?.nome.toLowerCase().includes(search.toLowerCase())
-  );
+  // Gerar lista de meses disponíveis baseado nas notas baixadas
+  const mesesDisponiveis = Array.from(
+    new Set(
+      solicitacoes
+        .filter(s => s.data_emissao_nota && s.status === 'baixada')
+        .map(s => {
+          const date = new Date(s.data_emissao_nota!);
+          return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        })
+    )
+  ).sort().reverse();
+
+  const filtered = solicitacoes.filter(s => {
+    const matchesSearch = s.empresas?.nome_fantasia.toLowerCase().includes(search.toLowerCase()) ||
+      s.profiles?.nome.toLowerCase().includes(search.toLowerCase());
+    
+    // Filtro por mês de competência
+    if (mesCompetencia !== 'all' && s.data_emissao_nota) {
+      const date = new Date(s.data_emissao_nota);
+      const mesAno = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      if (mesAno !== mesCompetencia) return false;
+    } else if (mesCompetencia !== 'all' && !s.data_emissao_nota) {
+      return false;
+    }
+    
+    return matchesSearch;
+  });
 
   return (
     <AppLayout>
@@ -258,12 +283,29 @@ export default function AdminSolicitacoes() {
               <SelectValue placeholder="Status" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Todos</SelectItem>
+              <SelectItem value="all">Todos os status</SelectItem>
               <SelectItem value="enviada">Aguardando</SelectItem>
               <SelectItem value="entregue">Entregues</SelectItem>
               <SelectItem value="baixada">Baixadas</SelectItem>
               <SelectItem value="rejeitada">Rejeitadas</SelectItem>
               <SelectItem value="pendente_ajuste">Pendente Ajuste</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={mesCompetencia} onValueChange={setMesCompetencia}>
+            <SelectTrigger className="w-full sm:w-48">
+              <SelectValue placeholder="Mês Competência" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os meses</SelectItem>
+              {mesesDisponiveis.map((mes) => {
+                const [ano, mesNum] = mes.split('-');
+                const meses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+                return (
+                  <SelectItem key={mes} value={mes}>
+                    {meses[parseInt(mesNum) - 1]}/{ano}
+                  </SelectItem>
+                );
+              })}
             </SelectContent>
           </Select>
         </div>
@@ -284,6 +326,7 @@ export default function AdminSolicitacoes() {
                     <th className="text-left py-3 px-4 text-sm font-medium">Empresa</th>
                     <th className="text-left py-3 px-4 text-sm font-medium">Solicitado</th>
                     <th className="text-left py-3 px-4 text-sm font-medium">Entregue</th>
+                    <th className="text-left py-3 px-4 text-sm font-medium">Data Nota</th>
                     <th className="text-left py-3 px-4 text-sm font-medium">Status</th>
                     <th className="text-left py-3 px-4 text-sm font-medium">Alertas</th>
                     <th className="text-left py-3 px-4 text-sm font-medium">Ações</th>
@@ -302,6 +345,7 @@ export default function AdminSolicitacoes() {
                       <td className="py-3 px-4 text-sm">{sol.empresas?.nome_fantasia || '-'}</td>
                       <td className="py-3 px-4 text-sm font-medium">{formatCurrency(sol.valor_solicitado)}</td>
                       <td className="py-3 px-4 text-sm">{sol.valor_entregue ? formatCurrency(sol.valor_entregue) : '-'}</td>
+                      <td className="py-3 px-4 text-sm">{sol.data_emissao_nota ? formatDate(sol.data_emissao_nota) : '-'}</td>
                       <td className="py-3 px-4"><StatusBadge status={sol.status} /></td>
                       <td className="py-3 px-4">
                         <div className="flex gap-1">
@@ -513,6 +557,12 @@ export default function AdminSolicitacoes() {
                     <p className="text-sm text-muted-foreground">Valor Entregue</p>
                     <p className="font-medium">{selectedSolicitacao.valor_entregue ? formatCurrency(selectedSolicitacao.valor_entregue) : '-'}</p>
                   </div>
+                  {selectedSolicitacao.data_emissao_nota && (
+                    <div>
+                      <p className="text-sm text-muted-foreground">Data Emissão Nota</p>
+                      <p className="font-medium">{formatDate(selectedSolicitacao.data_emissao_nota)}</p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Alertas */}
