@@ -13,6 +13,7 @@ import Baixa from "./pages/user/Baixa";
 import AdminDashboard from "./pages/admin/Dashboard";
 import Empresas from "./pages/admin/Empresas";
 import AdminSolicitacoes from "./pages/admin/Solicitacoes";
+import GestaoSaldo from "./pages/admin/GestaoSaldo";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -47,6 +48,7 @@ function AppRoutes() {
       <Route path="/admin" element={<ProtectedRoute adminOnly><AdminDashboard /></ProtectedRoute>} />
       <Route path="/admin/empresas" element={<ProtectedRoute adminOnly><Empresas /></ProtectedRoute>} />
       <Route path="/admin/solicitacoes" element={<ProtectedRoute adminOnly><AdminSolicitacoes /></ProtectedRoute>} />
+      <Route path="/admin/gestao-saldo" element={<ProtectedRoute adminOnly><GestaoSaldo /></ProtectedRoute>} />
       
       <Route path="*" element={<NotFound />} />
     </Routes>

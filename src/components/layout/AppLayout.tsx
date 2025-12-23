@@ -39,6 +39,7 @@ export function AppLayout({ children }: AppLayoutProps) {
 
   const adminMenuItems = [
     { icon: Home, label: 'Dashboard', path: '/admin' },
+    { icon: Wallet, label: 'Gestão de Saldo', path: '/admin/gestao-saldo' },
     { icon: Building2, label: 'Empresas', path: '/admin/empresas' },
     { icon: FileText, label: 'Solicitações', path: '/admin/solicitacoes' },
     { icon: BarChart3, label: 'Relatórios', path: '/admin/relatorios' },

@@ -76,6 +76,60 @@ export type Database = {
           },
         ]
       }
+      historico_fundos: {
+        Row: {
+          admin_id: string | null
+          created_at: string
+          descricao: string | null
+          fundo_id: string
+          id: string
+          saldo_anterior: number
+          saldo_posterior: number
+          solicitacao_id: string | null
+          tipo: string
+          valor: number
+        }
+        Insert: {
+          admin_id?: string | null
+          created_at?: string
+          descricao?: string | null
+          fundo_id: string
+          id?: string
+          saldo_anterior: number
+          saldo_posterior: number
+          solicitacao_id?: string | null
+          tipo: string
+          valor: number
+        }
+        Update: {
+          admin_id?: string | null
+          created_at?: string
+          descricao?: string | null
+          fundo_id?: string
+          id?: string
+          saldo_anterior?: number
+          saldo_posterior?: number
+          solicitacao_id?: string | null
+          tipo?: string
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "historico_fundos_fundo_id_fkey"
+            columns: ["fundo_id"]
+            isOneToOne: false
+            referencedRelation: "fundos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "historico_fundos_solicitacao_id_fkey"
+            columns: ["solicitacao_id"]
+            isOneToOne: false
+            referencedRelation: "solicitacoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notificacoes: {
         Row: {
           created_at: string
@@ -152,15 +206,19 @@ export type Database = {
           data_emissao_nota: string | null
           descricao_compra: string | null
           empresa_id: string
+          excedeu_limite_maximo: boolean
+          excedeu_saldo: boolean
           forma_entrega: string | null
           id: string
           justificativa: string
+          justificativa_excesso_admin: string | null
           motivo_rejeicao: string | null
           nome_emitente: string | null
           numero_nota: string | null
           observacoes_admin: string | null
           solicitante_user_id: string
           status: Database["public"]["Enums"]["status_solicitacao"]
+          tipo_solicitacao: Database["public"]["Enums"]["tipo_solicitacao"]
           troco_real: number | null
           updated_at: string
           upload_nota_fiscal_url: string | null
@@ -183,15 +241,19 @@ export type Database = {
           data_emissao_nota?: string | null
           descricao_compra?: string | null
           empresa_id: string
+          excedeu_limite_maximo?: boolean
+          excedeu_saldo?: boolean
           forma_entrega?: string | null
           id?: string
           justificativa: string
+          justificativa_excesso_admin?: string | null
           motivo_rejeicao?: string | null
           nome_emitente?: string | null
           numero_nota?: string | null
           observacoes_admin?: string | null
           solicitante_user_id: string
           status?: Database["public"]["Enums"]["status_solicitacao"]
+          tipo_solicitacao?: Database["public"]["Enums"]["tipo_solicitacao"]
           troco_real?: number | null
           updated_at?: string
           upload_nota_fiscal_url?: string | null
@@ -214,15 +276,19 @@ export type Database = {
           data_emissao_nota?: string | null
           descricao_compra?: string | null
           empresa_id?: string
+          excedeu_limite_maximo?: boolean
+          excedeu_saldo?: boolean
           forma_entrega?: string | null
           id?: string
           justificativa?: string
+          justificativa_excesso_admin?: string | null
           motivo_rejeicao?: string | null
           nome_emitente?: string | null
           numero_nota?: string | null
           observacoes_admin?: string | null
           solicitante_user_id?: string
           status?: Database["public"]["Enums"]["status_solicitacao"]
+          tipo_solicitacao?: Database["public"]["Enums"]["tipo_solicitacao"]
           troco_real?: number | null
           updated_at?: string
           upload_nota_fiscal_url?: string | null
@@ -282,6 +348,7 @@ export type Database = {
         | "rejeitada"
         | "baixada"
         | "pendente_ajuste"
+      tipo_solicitacao: "FUNDO_FIXO" | "COMPRA_AVULSA"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -420,6 +487,7 @@ export const Constants = {
         "baixada",
         "pendente_ajuste",
       ],
+      tipo_solicitacao: ["FUNDO_FIXO", "COMPRA_AVULSA"],
     },
   },
 } as const

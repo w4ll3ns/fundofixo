@@ -7,12 +7,16 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatCurrency, formatDate, maskCurrency, parseCurrency } from '@/lib/masks';
-import { Search, Check, X, Eye } from 'lucide-react';
+import { LIMITE_MAXIMO_SOLICITACAO, TIPOS_SOLICITACAO_LABELS, TipoSolicitacao } from '@/lib/constants';
+import { Search, Check, X, Eye, AlertTriangle, Wallet } from 'lucide-react';
 
 type StatusType = 'enviada' | 'aprovada' | 'entregue' | 'rejeitada' | 'baixada' | 'pendente_ajuste';
 
@@ -24,14 +28,26 @@ interface Solicitacao {
   created_at: string;
   justificativa: string;
   categoria: string | null;
+  tipo_solicitacao: TipoSolicitacao;
+  excedeu_saldo: boolean;
+  excedeu_limite_maximo: boolean;
+  empresa_id: string;
+  solicitante_user_id: string;
   empresas: { nome_fantasia: string } | null;
   profiles: { nome: string } | null;
+}
+
+interface Fundo {
+  id: string;
+  empresa_id: string;
+  saldo_atual: number;
 }
 
 export default function AdminSolicitacoes() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [solicitacoes, setSolicitacoes] = useState<Solicitacao[]>([]);
+  const [fundos, setFundos] = useState<Fundo[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [search, setSearch] = useState('');
@@ -44,29 +60,46 @@ export default function AdminSolicitacoes() {
   const [formaEntrega, setFormaEntrega] = useState('dinheiro');
   const [observacoes, setObservacoes] = useState('');
   const [motivoRejeicao, setMotivoRejeicao] = useState('');
+  const [autorizarExcesso, setAutorizarExcesso] = useState(false);
+  const [justificativaExcesso, setJustificativaExcesso] = useState('');
 
-  const fetchSolicitacoes = async () => {
+  const fetchData = async () => {
     let query = supabase
       .from('solicitacoes')
-      .select('id, valor_solicitado, valor_entregue, status, created_at, justificativa, categoria, empresas(nome_fantasia), profiles:solicitante_user_id(nome)')
+      .select('id, valor_solicitado, valor_entregue, status, created_at, justificativa, categoria, tipo_solicitacao, excedeu_saldo, excedeu_limite_maximo, empresa_id, solicitante_user_id, empresas(nome_fantasia), profiles:solicitante_user_id(nome)')
       .order('created_at', { ascending: false });
 
     if (statusFilter !== 'all') {
       query = query.eq('status', statusFilter as StatusType);
     }
 
-    const { data } = await query;
-    if (data) setSolicitacoes(data as unknown as Solicitacao[]);
+    const [solicitacoesRes, fundosRes] = await Promise.all([
+      query,
+      supabase.from('fundos').select('id, empresa_id, saldo_atual'),
+    ]);
+
+    if (solicitacoesRes.data) setSolicitacoes(solicitacoesRes.data as unknown as Solicitacao[]);
+    if (fundosRes.data) setFundos(fundosRes.data);
     setLoading(false);
   };
 
-  useEffect(() => { fetchSolicitacoes(); }, [statusFilter]);
+  useEffect(() => { fetchData(); }, [statusFilter]);
+
+  const getSaldoEmpresa = (empresaId: string) => {
+    return fundos.find(f => f.empresa_id === empresaId)?.saldo_atual || 0;
+  };
+
+  const getFundoId = (empresaId: string) => {
+    return fundos.find(f => f.empresa_id === empresaId)?.id;
+  };
 
   const openApprove = (sol: Solicitacao) => {
     setSelectedSolicitacao(sol);
     setValorEntregue(maskCurrency(String(sol.valor_solicitado * 100)));
     setFormaEntrega('dinheiro');
     setObservacoes('');
+    setAutorizarExcesso(false);
+    setJustificativaExcesso('');
     setApproveDialogOpen(true);
   };
 
@@ -89,31 +122,86 @@ export default function AdminSolicitacoes() {
       return;
     }
 
-    const { error } = await supabase.from('solicitacoes').update({
-      status: 'entregue',
-      valor_entregue: valor,
-      forma_entrega: formaEntrega,
-      observacoes_admin: observacoes || null,
-      admin_aprovador_id: user?.id,
-      data_aprovacao: new Date().toISOString(),
-    }).eq('id', selectedSolicitacao.id);
+    const saldoAtual = getSaldoEmpresa(selectedSolicitacao.empresa_id);
+    const fundoId = getFundoId(selectedSolicitacao.empresa_id);
+    const isFundoFixo = selectedSolicitacao.tipo_solicitacao === 'FUNDO_FIXO';
+    const excedeValor = valor > LIMITE_MAXIMO_SOLICITACAO;
+    const excedeSaldo = isFundoFixo && valor > saldoAtual;
 
-    if (error) {
-      toast({ title: 'Erro ao aprovar', description: error.message, variant: 'destructive' });
+    // Check if authorization is needed
+    if ((excedeValor || excedeSaldo) && !autorizarExcesso) {
+      toast({ 
+        title: 'Autorização necessária', 
+        description: 'Marque a opção para autorizar o excesso e forneça uma justificativa.', 
+        variant: 'destructive' 
+      });
       return;
     }
 
-    // Create notification for user
-    await supabase.from('notificacoes').insert({
-      user_id: selectedSolicitacao.id, // This should be solicitante_user_id, but we don't have it here
-      titulo: 'Solicitação Aprovada',
-      mensagem: `Sua solicitação de ${formatCurrency(selectedSolicitacao.valor_solicitado)} foi aprovada. Valor entregue: ${formatCurrency(valor)}`,
-      tipo: 'success',
-    });
+    if ((excedeValor || excedeSaldo) && autorizarExcesso && !justificativaExcesso.trim()) {
+      toast({ 
+        title: 'Justificativa necessária', 
+        description: 'Forneça uma justificativa para autorizar o excesso.', 
+        variant: 'destructive' 
+      });
+      return;
+    }
 
-    toast({ title: 'Solicitação aprovada!' });
-    setApproveDialogOpen(false);
-    fetchSolicitacoes();
+    try {
+      // Update solicitação
+      const { error: updateError } = await supabase.from('solicitacoes').update({
+        status: 'entregue',
+        valor_entregue: valor,
+        forma_entrega: formaEntrega,
+        observacoes_admin: observacoes || null,
+        admin_aprovador_id: user?.id,
+        data_aprovacao: new Date().toISOString(),
+        excedeu_saldo: excedeSaldo,
+        excedeu_limite_maximo: excedeValor,
+        justificativa_excesso_admin: (excedeValor || excedeSaldo) ? justificativaExcesso : null,
+      }).eq('id', selectedSolicitacao.id);
+
+      if (updateError) throw updateError;
+
+      // If FUNDO_FIXO, update saldo and create history
+      if (isFundoFixo && fundoId) {
+        const novoSaldo = saldoAtual - valor;
+
+        // Update fundo saldo
+        const { error: fundoError } = await supabase
+          .from('fundos')
+          .update({ saldo_atual: novoSaldo })
+          .eq('id', fundoId);
+
+        if (fundoError) throw fundoError;
+
+        // Create history record
+        await supabase.from('historico_fundos').insert({
+          fundo_id: fundoId,
+          tipo: 'saida',
+          valor: valor,
+          descricao: `Entrega solicitação - ${selectedSolicitacao.justificativa.substring(0, 50)}...`,
+          admin_id: user?.id,
+          solicitacao_id: selectedSolicitacao.id,
+          saldo_anterior: saldoAtual,
+          saldo_posterior: novoSaldo,
+        });
+      }
+
+      // Create notification for user
+      await supabase.from('notificacoes').insert({
+        user_id: selectedSolicitacao.solicitante_user_id,
+        titulo: 'Solicitação Aprovada',
+        mensagem: `Sua solicitação de ${formatCurrency(selectedSolicitacao.valor_solicitado)} foi aprovada. Valor entregue: ${formatCurrency(valor)}`,
+        tipo: 'success',
+      });
+
+      toast({ title: 'Solicitação aprovada!' });
+      setApproveDialogOpen(false);
+      fetchData();
+    } catch (error: any) {
+      toast({ title: 'Erro ao aprovar', description: error.message, variant: 'destructive' });
+    }
   };
 
   const handleReject = async () => {
@@ -134,9 +222,17 @@ export default function AdminSolicitacoes() {
       return;
     }
 
+    // Create notification
+    await supabase.from('notificacoes').insert({
+      user_id: selectedSolicitacao.solicitante_user_id,
+      titulo: 'Solicitação Rejeitada',
+      mensagem: `Sua solicitação de ${formatCurrency(selectedSolicitacao.valor_solicitado)} foi rejeitada. Motivo: ${motivoRejeicao}`,
+      tipo: 'error',
+    });
+
     toast({ title: 'Solicitação rejeitada' });
     setRejectDialogOpen(false);
-    fetchSolicitacoes();
+    fetchData();
   };
 
   const filtered = solicitacoes.filter(s =>
@@ -180,11 +276,13 @@ export default function AdminSolicitacoes() {
                 <thead className="bg-muted/50">
                   <tr>
                     <th className="text-left py-3 px-4 text-sm font-medium">Data</th>
+                    <th className="text-left py-3 px-4 text-sm font-medium">Tipo</th>
                     <th className="text-left py-3 px-4 text-sm font-medium">Solicitante</th>
                     <th className="text-left py-3 px-4 text-sm font-medium">Empresa</th>
                     <th className="text-left py-3 px-4 text-sm font-medium">Solicitado</th>
                     <th className="text-left py-3 px-4 text-sm font-medium">Entregue</th>
                     <th className="text-left py-3 px-4 text-sm font-medium">Status</th>
+                    <th className="text-left py-3 px-4 text-sm font-medium">Alertas</th>
                     <th className="text-left py-3 px-4 text-sm font-medium">Ações</th>
                   </tr>
                 </thead>
@@ -192,11 +290,30 @@ export default function AdminSolicitacoes() {
                   {filtered.map((sol) => (
                     <tr key={sol.id} className="border-t border-border hover:bg-muted/30">
                       <td className="py-3 px-4 text-sm">{formatDate(sol.created_at)}</td>
+                      <td className="py-3 px-4 text-sm">
+                        <Badge variant={sol.tipo_solicitacao === 'FUNDO_FIXO' ? 'default' : 'secondary'}>
+                          {TIPOS_SOLICITACAO_LABELS[sol.tipo_solicitacao] || sol.tipo_solicitacao}
+                        </Badge>
+                      </td>
                       <td className="py-3 px-4 text-sm">{sol.profiles?.nome || '-'}</td>
                       <td className="py-3 px-4 text-sm">{sol.empresas?.nome_fantasia || '-'}</td>
                       <td className="py-3 px-4 text-sm font-medium">{formatCurrency(sol.valor_solicitado)}</td>
                       <td className="py-3 px-4 text-sm">{sol.valor_entregue ? formatCurrency(sol.valor_entregue) : '-'}</td>
                       <td className="py-3 px-4"><StatusBadge status={sol.status} /></td>
+                      <td className="py-3 px-4">
+                        <div className="flex gap-1">
+                          {sol.excedeu_saldo && (
+                            <Badge variant="outline" className="text-warning border-warning text-xs">
+                              <Wallet className="h-3 w-3 mr-1" /> Saldo
+                            </Badge>
+                          )}
+                          {sol.excedeu_limite_maximo && (
+                            <Badge variant="outline" className="text-destructive border-destructive text-xs">
+                              <AlertTriangle className="h-3 w-3 mr-1" /> R$300
+                            </Badge>
+                          )}
+                        </div>
+                      </td>
                       <td className="py-3 px-4">
                         <div className="flex gap-1">
                           <Button size="sm" variant="ghost" onClick={() => openDetail(sol)}>
@@ -224,43 +341,101 @@ export default function AdminSolicitacoes() {
 
         {/* Approve Dialog */}
         <Dialog open={approveDialogOpen} onOpenChange={setApproveDialogOpen}>
-          <DialogContent>
+          <DialogContent className="max-w-lg">
             <DialogHeader>
               <DialogTitle>Aprovar e Entregar</DialogTitle>
               <DialogDescription>
-                Solicitação de {selectedSolicitacao ? formatCurrency(selectedSolicitacao.valor_solicitado) : ''}
+                Solicitação de {selectedSolicitacao ? formatCurrency(selectedSolicitacao.valor_solicitado) : ''} 
+                {selectedSolicitacao && ` - ${TIPOS_SOLICITACAO_LABELS[selectedSolicitacao.tipo_solicitacao]}`}
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label>Valor Entregue *</Label>
-                <Input
-                  value={valorEntregue}
-                  onChange={(e) => setValorEntregue(maskCurrency(e.target.value))}
-                  placeholder="R$ 0,00"
-                />
-                {selectedSolicitacao && parseCurrency(valorEntregue) < selectedSolicitacao.valor_solicitado && (
-                  <p className="text-sm text-warning">Valor menor que o solicitado</p>
+            
+            {selectedSolicitacao && (
+              <div className="space-y-4 py-4">
+                {/* Info sobre saldo (apenas FUNDO_FIXO) */}
+                {selectedSolicitacao.tipo_solicitacao === 'FUNDO_FIXO' && (
+                  <Alert>
+                    <Wallet className="h-4 w-4" />
+                    <AlertDescription>
+                      Saldo disponível da empresa: <strong>{formatCurrency(getSaldoEmpresa(selectedSolicitacao.empresa_id))}</strong>
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                <div className="space-y-2">
+                  <Label>Valor Entregue *</Label>
+                  <Input
+                    value={valorEntregue}
+                    onChange={(e) => setValorEntregue(maskCurrency(e.target.value))}
+                    placeholder="R$ 0,00"
+                  />
+                  {parseCurrency(valorEntregue) < selectedSolicitacao.valor_solicitado && (
+                    <p className="text-sm text-warning">Valor menor que o solicitado</p>
+                  )}
+                  {parseCurrency(valorEntregue) > LIMITE_MAXIMO_SOLICITACAO && (
+                    <p className="text-sm text-destructive flex items-center gap-1">
+                      <AlertTriangle className="h-4 w-4" />
+                      Excede limite máximo de {formatCurrency(LIMITE_MAXIMO_SOLICITACAO)}
+                    </p>
+                  )}
+                  {selectedSolicitacao.tipo_solicitacao === 'FUNDO_FIXO' && 
+                   parseCurrency(valorEntregue) > getSaldoEmpresa(selectedSolicitacao.empresa_id) && (
+                    <p className="text-sm text-warning flex items-center gap-1">
+                      <Wallet className="h-4 w-4" />
+                      Excede saldo disponível do fundo
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Forma de Entrega</Label>
+                  <Select value={formaEntrega} onValueChange={setFormaEntrega}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="dinheiro">Dinheiro</SelectItem>
+                      <SelectItem value="pix">PIX</SelectItem>
+                      <SelectItem value="outro">Outro</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Observações</Label>
+                  <Textarea value={observacoes} onChange={(e) => setObservacoes(e.target.value)} placeholder="Opcional..." />
+                </div>
+
+                {/* Autorização de excesso */}
+                {(parseCurrency(valorEntregue) > LIMITE_MAXIMO_SOLICITACAO || 
+                  (selectedSolicitacao.tipo_solicitacao === 'FUNDO_FIXO' && 
+                   parseCurrency(valorEntregue) > getSaldoEmpresa(selectedSolicitacao.empresa_id))) && (
+                  <div className="space-y-4 p-4 rounded-lg border border-warning bg-warning/5">
+                    <div className="flex items-center space-x-2">
+                      <Checkbox 
+                        id="autorizar" 
+                        checked={autorizarExcesso}
+                        onCheckedChange={(checked) => setAutorizarExcesso(!!checked)}
+                      />
+                      <Label htmlFor="autorizar" className="text-warning font-medium cursor-pointer">
+                        Autorizo exceder o limite/saldo
+                      </Label>
+                    </div>
+                    {autorizarExcesso && (
+                      <div className="space-y-2">
+                        <Label>Justificativa da Autorização *</Label>
+                        <Textarea 
+                          value={justificativaExcesso} 
+                          onChange={(e) => setJustificativaExcesso(e.target.value)}
+                          placeholder="Explique o motivo da autorização..."
+                        />
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
-              <div className="space-y-2">
-                <Label>Forma de Entrega</Label>
-                <Select value={formaEntrega} onValueChange={setFormaEntrega}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="dinheiro">Dinheiro</SelectItem>
-                    <SelectItem value="pix">PIX</SelectItem>
-                    <SelectItem value="outro">Outro</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Observações</Label>
-                <Textarea value={observacoes} onChange={(e) => setObservacoes(e.target.value)} placeholder="Opcional..." />
-              </div>
-            </div>
+            )}
+            
             <DialogFooter>
               <Button variant="outline" onClick={() => setApproveDialogOpen(false)}>Cancelar</Button>
               <Button onClick={handleApprove}>Aprovar e Entregar</Button>
@@ -302,6 +477,16 @@ export default function AdminSolicitacoes() {
               <div className="space-y-4 py-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
+                    <p className="text-sm text-muted-foreground">Tipo</p>
+                    <Badge variant={selectedSolicitacao.tipo_solicitacao === 'FUNDO_FIXO' ? 'default' : 'secondary'}>
+                      {TIPOS_SOLICITACAO_LABELS[selectedSolicitacao.tipo_solicitacao]}
+                    </Badge>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Status</p>
+                    <StatusBadge status={selectedSolicitacao.status} />
+                  </div>
+                  <div>
                     <p className="text-sm text-muted-foreground">Solicitante</p>
                     <p className="font-medium">{selectedSolicitacao.profiles?.nome || '-'}</p>
                   </div>
@@ -314,8 +499,8 @@ export default function AdminSolicitacoes() {
                     <p className="font-medium">{formatDate(selectedSolicitacao.created_at)}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">Status</p>
-                    <StatusBadge status={selectedSolicitacao.status} />
+                    <p className="text-sm text-muted-foreground">Categoria</p>
+                    <p className="font-medium">{selectedSolicitacao.categoria || '-'}</p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Valor Solicitado</p>
@@ -326,16 +511,27 @@ export default function AdminSolicitacoes() {
                     <p className="font-medium">{selectedSolicitacao.valor_entregue ? formatCurrency(selectedSolicitacao.valor_entregue) : '-'}</p>
                   </div>
                 </div>
+
+                {/* Alertas */}
+                {(selectedSolicitacao.excedeu_saldo || selectedSolicitacao.excedeu_limite_maximo) && (
+                  <div className="flex gap-2">
+                    {selectedSolicitacao.excedeu_saldo && (
+                      <Badge variant="outline" className="text-warning border-warning">
+                        Excedeu saldo do fundo
+                      </Badge>
+                    )}
+                    {selectedSolicitacao.excedeu_limite_maximo && (
+                      <Badge variant="outline" className="text-destructive border-destructive">
+                        Excedeu limite R$ 300
+                      </Badge>
+                    )}
+                  </div>
+                )}
+
                 <div>
                   <p className="text-sm text-muted-foreground">Justificativa</p>
                   <p className="mt-1">{selectedSolicitacao.justificativa}</p>
                 </div>
-                {selectedSolicitacao.categoria && (
-                  <div>
-                    <p className="text-sm text-muted-foreground">Categoria</p>
-                    <p className="font-medium">{selectedSolicitacao.categoria}</p>
-                  </div>
-                )}
               </div>
             )}
           </DialogContent>

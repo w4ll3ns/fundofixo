@@ -5,28 +5,36 @@ import { Card } from '@/components/ui/card';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { supabase } from '@/integrations/supabase/client';
 import { formatCurrency, formatDate } from '@/lib/masks';
-import { FileText, Clock, DollarSign, AlertTriangle, CheckCircle, XCircle } from 'lucide-react';
+import { FileText, Clock, DollarSign, AlertTriangle, Wallet, XCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 
 export default function AdminDashboard() {
-  const [stats, setStats] = useState({ aguardando: 0, entregas: 0, baixas: 0, ajustes: 0, iaFalhou: 0 });
+  const [stats, setStats] = useState({ aguardando: 0, ajustes: 0, iaFalhou: 0, saldoTotal: 0 });
   const [recentSolicitacoes, setRecentSolicitacoes] = useState<any[]>([]);
 
   useEffect(() => {
     const fetchData = async () => {
-      const { count: aguardando } = await supabase.from('solicitacoes').select('*', { count: 'exact', head: true }).eq('status', 'enviada');
-      const { count: ajustes } = await supabase.from('solicitacoes').select('*', { count: 'exact', head: true }).eq('status', 'pendente_ajuste');
-      const { count: iaFalhou } = await supabase.from('solicitacoes').select('*', { count: 'exact', head: true }).eq('ai_status', 'falhou');
-      
-      const { data: solicitacoes } = await supabase
-        .from('solicitacoes')
-        .select('id, valor_solicitado, status, created_at, empresas(nome_fantasia), profiles:solicitante_user_id(nome)')
-        .order('created_at', { ascending: false })
-        .limit(10);
+      const [aguardandoRes, ajustesRes, iaFalouRes, fundosRes, solicitacoesRes] = await Promise.all([
+        supabase.from('solicitacoes').select('*', { count: 'exact', head: true }).eq('status', 'enviada'),
+        supabase.from('solicitacoes').select('*', { count: 'exact', head: true }).eq('status', 'pendente_ajuste'),
+        supabase.from('solicitacoes').select('*', { count: 'exact', head: true }).eq('ai_status', 'falhou'),
+        supabase.from('fundos').select('saldo_atual'),
+        supabase.from('solicitacoes')
+          .select('id, valor_solicitado, status, created_at, empresas(nome_fantasia), profiles:solicitante_user_id(nome)')
+          .order('created_at', { ascending: false })
+          .limit(10),
+      ]);
 
-      setStats({ aguardando: aguardando || 0, entregas: 0, baixas: 0, ajustes: ajustes || 0, iaFalhou: iaFalhou || 0 });
-      setRecentSolicitacoes(solicitacoes || []);
+      const saldoTotal = (fundosRes.data || []).reduce((acc, f) => acc + Number(f.saldo_atual), 0);
+
+      setStats({ 
+        aguardando: aguardandoRes.count || 0, 
+        ajustes: ajustesRes.count || 0, 
+        iaFalhou: iaFalouRes.count || 0,
+        saldoTotal,
+      });
+      setRecentSolicitacoes(solicitacoesRes.data || []);
     };
     fetchData();
   }, []);
@@ -37,10 +45,10 @@ export default function AdminDashboard() {
         <h1 className="text-2xl font-bold">Dashboard Administrativo</h1>
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <StatCard title="Saldo Total Disponível" value={formatCurrency(stats.saldoTotal)} icon={<Wallet className="h-5 w-5" />} variant="success" />
           <StatCard title="Aguardando Aprovação" value={stats.aguardando} icon={<Clock className="h-5 w-5" />} variant="primary" />
           <StatCard title="Pendentes de Ajuste" value={stats.ajustes} icon={<AlertTriangle className="h-5 w-5" />} variant="warning" />
           <StatCard title="IA Falhou" value={stats.iaFalhou} icon={<XCircle className="h-5 w-5" />} variant="destructive" />
-          <StatCard title="Total Processado" value={formatCurrency(0)} icon={<DollarSign className="h-5 w-5" />} variant="success" />
         </div>
 
         <Card className="p-6">
