@@ -1,1 +1,4 @@
 project_id = "ynzfdujjzwskqwafpgyh"
+
+[functions.leitor-notas]
+verify_jwt = true
