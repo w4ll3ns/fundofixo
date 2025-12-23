@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -25,9 +25,10 @@ interface Solicitacao {
 
 export default function MinhasSolicitacoes() {
   const { user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [solicitacoes, setSolicitacoes] = useState<Solicitacao[]>([]);
   const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>(searchParams.get('status') || 'all');
   const [search, setSearch] = useState('');
 
   useEffect(() => {
@@ -72,7 +73,14 @@ export default function MinhasSolicitacoes() {
               className="pl-10"
             />
           </div>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <Select value={statusFilter} onValueChange={(value) => {
+            setStatusFilter(value);
+            if (value === 'all') {
+              setSearchParams({});
+            } else {
+              setSearchParams({ status: value });
+            }
+          }}>
             <SelectTrigger className="w-full sm:w-48">
               <SelectValue placeholder="Status" />
             </SelectTrigger>

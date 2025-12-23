@@ -13,6 +13,7 @@ interface StatCardProps {
   };
   variant?: 'default' | 'primary' | 'success' | 'warning' | 'destructive';
   className?: string;
+  onClick?: () => void;
 }
 
 const variantStyles = {
@@ -39,9 +40,18 @@ export function StatCard({
   trend,
   variant = 'default',
   className,
+  onClick,
 }: StatCardProps) {
   return (
-    <Card className={cn('p-6', variantStyles[variant], className)}>
+    <Card 
+      className={cn(
+        'p-6', 
+        variantStyles[variant], 
+        onClick && 'cursor-pointer hover:shadow-md transition-shadow',
+        className
+      )}
+      onClick={onClick}
+    >
       <div className="flex items-start justify-between">
         <div className="space-y-2">
           <p className="text-sm font-medium text-muted-foreground">{title}</p>

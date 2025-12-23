@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { StatCard } from '@/components/ui/stat-card';
 import { Card } from '@/components/ui/card';
@@ -21,13 +21,14 @@ interface Solicitacao {
 interface Stats {
   total: number;
   pendentes: number;
-  aprovadas: number;
+  entregues: number;
   pendentesAjuste: number;
 }
 
 export default function UserDashboard() {
   const { user } = useAuth();
-  const [stats, setStats] = useState<Stats>({ total: 0, pendentes: 0, aprovadas: 0, pendentesAjuste: 0 });
+  const navigate = useNavigate();
+  const [stats, setStats] = useState<Stats>({ total: 0, pendentes: 0, entregues: 0, pendentesAjuste: 0 });
   const [recentSolicitacoes, setRecentSolicitacoes] = useState<Solicitacao[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -56,11 +57,11 @@ export default function UserDashboard() {
           .eq('solicitante_user_id', user.id)
           .eq('status', 'enviada');
 
-        const { count: aprovadas } = await supabase
+        const { count: entregues } = await supabase
           .from('solicitacoes')
           .select('*', { count: 'exact', head: true })
           .eq('solicitante_user_id', user.id)
-          .in('status', ['aprovada', 'entregue']);
+          .eq('status', 'entregue');
 
         const { count: pendentesAjuste } = await supabase
           .from('solicitacoes')
@@ -71,7 +72,7 @@ export default function UserDashboard() {
         setStats({
           total: total || 0,
           pendentes: pendentes || 0,
-          aprovadas: aprovadas || 0,
+          entregues: entregues || 0,
           pendentesAjuste: pendentesAjuste || 0,
         });
       }
@@ -103,24 +104,28 @@ export default function UserDashboard() {
             value={stats.total}
             icon={<FileText className="h-5 w-5" />}
             variant="default"
+            onClick={() => navigate('/minhas-solicitacoes')}
           />
           <StatCard
             title="Aguardando Aprovação"
             value={stats.pendentes}
             icon={<Clock className="h-5 w-5" />}
             variant="primary"
+            onClick={() => navigate('/minhas-solicitacoes?status=enviada')}
           />
           <StatCard
             title="Prontas para Baixa"
-            value={stats.aprovadas}
+            value={stats.entregues}
             icon={<CheckCircle className="h-5 w-5" />}
             variant="success"
+            onClick={() => navigate('/minhas-solicitacoes?status=entregue')}
           />
           <StatCard
             title="Pendentes de Ajuste"
             value={stats.pendentesAjuste}
             icon={<AlertTriangle className="h-5 w-5" />}
             variant="warning"
+            onClick={() => navigate('/minhas-solicitacoes?status=pendente_ajuste')}
           />
         </div>
 

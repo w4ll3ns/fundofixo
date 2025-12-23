@@ -18,6 +18,7 @@ interface Solicitacao {
   valor_solicitado: number;
   valor_entregue: number;
   status: string;
+  empresa_id: string;
   empresas: { nome_fantasia: string } | null;
 }
 
@@ -62,7 +63,7 @@ export default function Baixa() {
       if (!id) return;
       const { data } = await supabase
         .from('solicitacoes')
-        .select('id, valor_solicitado, valor_entregue, status, empresas(nome_fantasia)')
+        .select('id, valor_solicitado, valor_entregue, status, empresa_id, empresas(nome_fantasia)')
         .eq('id', id)
         .maybeSingle();
 
@@ -182,6 +183,36 @@ export default function Baixa() {
       toast({ title: 'Erro ao salvar baixa', description: error.message, variant: 'destructive' });
       setSubmitting(false);
       return;
+    }
+
+    // Se houve troco positivo e a baixa foi concluída, devolver ao saldo do fundo
+    if (trocoReal > 0 && newStatus === 'baixada') {
+      // Buscar o fundo da empresa
+      const { data: fundo } = await supabase
+        .from('fundos')
+        .select('id, saldo_atual')
+        .eq('empresa_id', solicitacao.empresa_id)
+        .maybeSingle();
+
+      if (fundo) {
+        const novoSaldo = Number(fundo.saldo_atual) + trocoReal;
+        
+        // Atualizar saldo do fundo
+        await supabase.from('fundos').update({
+          saldo_atual: novoSaldo,
+        }).eq('id', fundo.id);
+
+        // Registrar no histórico
+        await supabase.from('historico_fundos').insert({
+          fundo_id: fundo.id,
+          solicitacao_id: solicitacao.id,
+          tipo: 'devolucao_troco',
+          valor: trocoReal,
+          saldo_anterior: fundo.saldo_atual,
+          saldo_posterior: novoSaldo,
+          descricao: `Troco devolvido da solicitação`,
+        });
+      }
     }
 
     toast({ title: 'Baixa realizada com sucesso!' });
