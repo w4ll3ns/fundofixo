@@ -58,7 +58,7 @@ export function AppLayout({ children }: AppLayoutProps) {
         <div className="flex h-14 lg:h-16 items-center justify-between px-4 lg:px-6">
           <Link to={isAdmin ? '/admin' : '/dashboard'} className="flex items-center gap-2">
             <Wallet className="h-6 w-6 lg:h-7 lg:w-7 text-primary" />
-            <span className="text-lg lg:text-xl font-semibold text-foreground">Caixinha</span>
+            <span className="text-lg lg:text-xl font-semibold text-foreground">Fundo Fixo</span>
           </Link>
 
           <div className="flex items-center gap-2 lg:gap-3">

@@ -1,7 +1,7 @@
 {
-  "name": "Caixinha",
-  "short_name": "Caixinha",
-  "description": "Sistema de controle de fundo fixo e solicitações de pagamento",
+  "name": "Fundo Fixo - Grupo Ceuma",
+  "short_name": "Fundo Fixo",
+  "description": "Sistema de controle de fundo fixo e solicitações de pagamento - Grupo Ceuma",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
