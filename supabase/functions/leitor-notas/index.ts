@@ -39,9 +39,13 @@ serve(async (req) => {
     
     console.log('File type detection - isPDF:', isPDF);
 
-    const systemPrompt = `Você é um especialista em leitura de notas fiscais brasileiras. Analise o documento fornecido e extraia as seguintes informações:
+const systemPrompt = `Você é um especialista em leitura de notas fiscais brasileiras. Analise o documento fornecido e extraia as informações de TODAS as notas fiscais encontradas.
 
-1. VALOR TOTAL - Este é o mais importante. Procure por:
+IMPORTANTE: Um documento pode conter MÚLTIPLAS notas fiscais (uma por página ou várias na mesma página). Você deve identificar e extrair CADA nota fiscal separadamente.
+
+Para CADA nota fiscal encontrada, extraia:
+
+1. VALOR TOTAL - Procure por:
    - "TOTAL", "VALOR TOTAL", "TOTAL A PAGAR", "VALOR A PAGAR", "TOTAL GERAL"
    - O maior valor monetário próximo a essas palavras-chave
    - Ignore subtotais, descontos, taxas isoladas
@@ -54,23 +58,34 @@ serve(async (req) => {
 
 5. NOME DO EMITENTE/RAZÃO SOCIAL
 
+6. PÁGINA - em qual página está a nota (1, 2, 3...)
+
 Responda SEMPRE em JSON válido com esta estrutura exata:
 {
-  "total_value": número ou null se não encontrado,
-  "confidence_label": "alta" | "media" | "baixa",
-  "evidence_text": "trecho onde encontrou o total (máximo 50 caracteres)",
-  "extracted_fields": {
-    "data_emissao": "YYYY-MM-DD" ou null,
-    "numero_nota": "string" ou null,
-    "cnpj_emitente": "apenas números" ou null,
-    "nome_emitente": "string" ou null
-  }
+  "notas_encontradas": número total de notas encontradas,
+  "notas": [
+    {
+      "pagina": número da página onde a nota foi encontrada,
+      "total_value": número ou null se não encontrado,
+      "confidence_label": "alta" | "media" | "baixa",
+      "evidence_text": "trecho onde encontrou o total (máximo 50 caracteres)",
+      "extracted_fields": {
+        "data_emissao": "YYYY-MM-DD" ou null,
+        "numero_nota": "string" ou null,
+        "cnpj_emitente": "apenas números" ou null,
+        "nome_emitente": "string" ou null
+      }
+    }
+  ]
 }
 
 Regras de confiança:
 - ALTA: encontrou "TOTAL" ou similar com valor claro
 - MEDIA: encontrou um valor que parece ser o total mas sem keyword clara
-- BAIXA: não tem certeza ou encontrou múltiplos candidatos`;
+- BAIXA: não tem certeza ou encontrou múltiplos candidatos
+
+Se o documento tiver apenas UMA nota fiscal, ainda retorne no formato de array com um único elemento.
+Se não conseguir identificar nenhuma nota fiscal válida, retorne: { "notas_encontradas": 0, "notas": [] }`;
 
     // Extract base64 data without prefix if present
     let base64Data = file_base64;
@@ -179,7 +194,7 @@ Regras de confiança:
 
     console.log('AI response:', content);
 
-    // Parse the JSON response
+// Parse the JSON response
     let result;
     try {
       // Remove markdown code blocks if present
@@ -194,32 +209,51 @@ Regras de confiança:
       }
       jsonStr = jsonStr.trim();
       
-      result = JSON.parse(jsonStr);
+      const parsed = JSON.parse(jsonStr);
+      
+      // Handle new multi-note format
+      if (parsed.notas_encontradas !== undefined && Array.isArray(parsed.notas)) {
+        result = parsed;
+        console.log(`Found ${result.notas_encontradas} invoice(s)`);
+      } 
+      // Handle legacy single-note format (convert to new format)
+      else if (parsed.total_value !== undefined) {
+        result = {
+          notas_encontradas: 1,
+          notas: [{
+            pagina: 1,
+            total_value: parsed.total_value,
+            confidence_label: parsed.confidence_label || 'baixa',
+            evidence_text: parsed.evidence_text || '',
+            extracted_fields: parsed.extracted_fields || {}
+          }]
+        };
+        console.log('Converted legacy format to multi-note format');
+      } else {
+        throw new Error('Unrecognized response format');
+      }
     } catch (parseError) {
       console.error('Failed to parse AI response:', parseError);
       result = {
-        total_value: null,
-        confidence_label: 'baixa',
-        evidence_text: '',
-        extracted_fields: {},
+        notas_encontradas: 0,
+        notas: [],
+        error: 'Falha ao interpretar resposta da IA'
       };
     }
 
-    console.log('Parsed result:', result);
+    console.log('Parsed result:', JSON.stringify(result, null, 2));
 
     return new Response(
       JSON.stringify(result),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
-  } catch (error) {
+} catch (error) {
     console.error('Error processing invoice:', error);
     return new Response(
       JSON.stringify({ 
-        total_value: null,
-        confidence_label: 'baixa',
-        evidence_text: '',
-        extracted_fields: {},
+        notas_encontradas: 0,
+        notas: [],
         error: error instanceof Error ? error.message : 'Erro desconhecido'
       }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
