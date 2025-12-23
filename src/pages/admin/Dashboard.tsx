@@ -1,0 +1,79 @@
+import { useEffect, useState } from 'react';
+import { AppLayout } from '@/components/layout/AppLayout';
+import { StatCard } from '@/components/ui/stat-card';
+import { Card } from '@/components/ui/card';
+import { StatusBadge } from '@/components/ui/status-badge';
+import { supabase } from '@/integrations/supabase/client';
+import { formatCurrency, formatDate } from '@/lib/masks';
+import { FileText, Clock, DollarSign, AlertTriangle, CheckCircle, XCircle } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
+
+export default function AdminDashboard() {
+  const [stats, setStats] = useState({ aguardando: 0, entregas: 0, baixas: 0, ajustes: 0, iaFalhou: 0 });
+  const [recentSolicitacoes, setRecentSolicitacoes] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      const { count: aguardando } = await supabase.from('solicitacoes').select('*', { count: 'exact', head: true }).eq('status', 'enviada');
+      const { count: ajustes } = await supabase.from('solicitacoes').select('*', { count: 'exact', head: true }).eq('status', 'pendente_ajuste');
+      const { count: iaFalhou } = await supabase.from('solicitacoes').select('*', { count: 'exact', head: true }).eq('ai_status', 'falhou');
+      
+      const { data: solicitacoes } = await supabase
+        .from('solicitacoes')
+        .select('id, valor_solicitado, status, created_at, empresas(nome_fantasia), profiles:solicitante_user_id(nome)')
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      setStats({ aguardando: aguardando || 0, entregas: 0, baixas: 0, ajustes: ajustes || 0, iaFalhou: iaFalhou || 0 });
+      setRecentSolicitacoes(solicitacoes || []);
+    };
+    fetchData();
+  }, []);
+
+  return (
+    <AppLayout>
+      <div className="space-y-6 animate-fade-in">
+        <h1 className="text-2xl font-bold">Dashboard Administrativo</h1>
+
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <StatCard title="Aguardando Aprovação" value={stats.aguardando} icon={<Clock className="h-5 w-5" />} variant="primary" />
+          <StatCard title="Pendentes de Ajuste" value={stats.ajustes} icon={<AlertTriangle className="h-5 w-5" />} variant="warning" />
+          <StatCard title="IA Falhou" value={stats.iaFalhou} icon={<XCircle className="h-5 w-5" />} variant="destructive" />
+          <StatCard title="Total Processado" value={formatCurrency(0)} icon={<DollarSign className="h-5 w-5" />} variant="success" />
+        </div>
+
+        <Card className="p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold">Solicitações Recentes</h2>
+            <Button variant="ghost" asChild><Link to="/admin/solicitacoes">Ver todas</Link></Button>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-border">
+                  <th className="text-left py-3 px-2 text-sm font-medium text-muted-foreground">Data</th>
+                  <th className="text-left py-3 px-2 text-sm font-medium text-muted-foreground">Solicitante</th>
+                  <th className="text-left py-3 px-2 text-sm font-medium text-muted-foreground">Empresa</th>
+                  <th className="text-left py-3 px-2 text-sm font-medium text-muted-foreground">Valor</th>
+                  <th className="text-left py-3 px-2 text-sm font-medium text-muted-foreground">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {recentSolicitacoes.map((sol) => (
+                  <tr key={sol.id} className="border-b border-border hover:bg-muted/50">
+                    <td className="py-3 px-2 text-sm">{formatDate(sol.created_at)}</td>
+                    <td className="py-3 px-2 text-sm">{sol.profiles?.nome || '-'}</td>
+                    <td className="py-3 px-2 text-sm">{sol.empresas?.nome_fantasia || '-'}</td>
+                    <td className="py-3 px-2 text-sm font-medium">{formatCurrency(sol.valor_solicitado)}</td>
+                    <td className="py-3 px-2"><StatusBadge status={sol.status} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      </div>
+    </AppLayout>
+  );
+}
