@@ -14,6 +14,30 @@ export type Database = {
   }
   public: {
     Tables: {
+      dominios_email_permitidos: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          created_by: string | null
+          dominio: string
+          id: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          created_by?: string | null
+          dominio: string
+          id?: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          created_by?: string | null
+          dominio?: string
+          id?: string
+        }
+        Relationships: []
+      }
       empresas: {
         Row: {
           cnpj: string

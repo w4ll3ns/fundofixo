@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -88,6 +89,26 @@ export default function Auth() {
           variant: 'destructive',
         });
         return;
+      }
+
+      // Verificar se há domínios configurados e validar
+      const { data: dominios } = await supabase
+        .from('dominios_email_permitidos')
+        .select('dominio')
+        .eq('ativo', true);
+
+      if (dominios && dominios.length > 0) {
+        const emailDomain = signupForm.email.split('@')[1]?.toLowerCase();
+        const isAllowed = dominios.some(d => d.dominio === emailDomain);
+        
+        if (!isAllowed) {
+          toast({
+            title: 'Domínio não autorizado',
+            description: 'O domínio do seu email não está autorizado para cadastro. Entre em contato com o administrador.',
+            variant: 'destructive',
+          });
+          return;
+        }
       }
 
       const { error } = await signUp(signupForm.email, signupForm.password, signupForm.nome);
