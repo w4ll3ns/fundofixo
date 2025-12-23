@@ -51,6 +51,14 @@ const categorias = [
 
 type ImportStep = 'upload' | 'form' | 'confirm';
 
+interface DuplicataInfo {
+  id: string;
+  numero_nota: string | null;
+  nome_emitente: string | null;
+  created_at: string;
+  tipo: 'hash' | 'nota_cnpj';
+}
+
 interface ImportarNotaProps {
   onSuccess?: () => void;
 }
@@ -74,6 +82,7 @@ export function ImportarNota({ onSuccess }: ImportarNotaProps) {
 
   const [file, setFile] = useState<File | null>(null);
   const [fileUrl, setFileUrl] = useState<string | null>(null);
+  const [fileHash, setFileHash] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [aiResult, setAiResult] = useState<AIResult | null>(null);
@@ -84,6 +93,8 @@ export function ImportarNota({ onSuccess }: ImportarNotaProps) {
   const [cnpjEmitente, setCnpjEmitente] = useState('');
   const [descricaoCompra, setDescricaoCompra] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [duplicata, setDuplicata] = useState<DuplicataInfo | null>(null);
+  const [checkingDuplicate, setCheckingDuplicate] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -117,6 +128,43 @@ export function ImportarNota({ onSuccess }: ImportarNotaProps) {
     });
   };
 
+  const calculateFileHash = async (file: File): Promise<string> => {
+    const buffer = await file.arrayBuffer();
+    const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  };
+
+  const checkDuplicateByHash = async (hash: string): Promise<DuplicataInfo | null> => {
+    const { data } = await supabase
+      .from('solicitacoes')
+      .select('id, numero_nota, nome_emitente, created_at')
+      .eq('arquivo_hash', hash)
+      .limit(1);
+    
+    if (data && data.length > 0) {
+      return { ...data[0], tipo: 'hash' };
+    }
+    return null;
+  };
+
+  const checkDuplicateByNotaCnpj = async (numNota: string, cnpj: string): Promise<DuplicataInfo | null> => {
+    if (!numNota || !cnpj) return null;
+    
+    const cnpjLimpo = cnpj.replace(/\D/g, '');
+    const { data } = await supabase
+      .from('solicitacoes')
+      .select('id, numero_nota, nome_emitente, created_at')
+      .eq('numero_nota', numNota)
+      .eq('cnpj_emitente', cnpjLimpo)
+      .limit(1);
+    
+    if (data && data.length > 0) {
+      return { ...data[0], tipo: 'nota_cnpj' };
+    }
+    return null;
+  };
+
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (!selectedFile) return;
@@ -133,11 +181,32 @@ export function ImportarNota({ onSuccess }: ImportarNotaProps) {
     }
 
     setFile(selectedFile);
-    setUploading(true);
+    setCheckingDuplicate(true);
+    setDuplicata(null);
     setAiResult(null);
     setAiError(false);
 
     try {
+      // Calcular hash do arquivo
+      const hash = await calculateFileHash(selectedFile);
+      setFileHash(hash);
+
+      // Verificar duplicata por hash
+      const duplicataHash = await checkDuplicateByHash(hash);
+      if (duplicataHash) {
+        setDuplicata(duplicataHash);
+        setCheckingDuplicate(false);
+        toast({ 
+          title: 'Arquivo já importado!', 
+          description: 'Este arquivo já foi utilizado em outra solicitação', 
+          variant: 'destructive' 
+        });
+        return;
+      }
+
+      setCheckingDuplicate(false);
+      setUploading(true);
+
       const filePath = `${user?.id}/importados/${Date.now()}-${selectedFile.name}`;
       
       const { error: uploadError } = await supabase.storage
@@ -162,13 +231,31 @@ export function ImportarNota({ onSuccess }: ImportarNotaProps) {
         setAiError(true);
         toast({ title: 'IA não conseguiu ler a nota', description: 'Preencha os campos manualmente', variant: 'destructive' });
       } else {
-        setAiResult(aiData as AIResult);
-        setValorDisplay(maskCurrency(String(aiData.total_value * 100)));
-        setForm({ ...form, valor_solicitado: aiData.total_value });
-        if (aiData.extracted_fields?.data_emissao) setDataEmissao(aiData.extracted_fields.data_emissao);
-        if (aiData.extracted_fields?.numero_nota) setNumeroNota(aiData.extracted_fields.numero_nota);
-        if (aiData.extracted_fields?.nome_emitente) setNomeEmitente(aiData.extracted_fields.nome_emitente);
-        if (aiData.extracted_fields?.cnpj_emitente) setCnpjEmitente(maskCNPJ(aiData.extracted_fields.cnpj_emitente));
+        const result = aiData as AIResult;
+        setAiResult(result);
+        setValorDisplay(maskCurrency(String(result.total_value! * 100)));
+        setForm({ ...form, valor_solicitado: result.total_value! });
+        if (result.extracted_fields?.data_emissao) setDataEmissao(result.extracted_fields.data_emissao);
+        if (result.extracted_fields?.numero_nota) setNumeroNota(result.extracted_fields.numero_nota);
+        if (result.extracted_fields?.nome_emitente) setNomeEmitente(result.extracted_fields.nome_emitente);
+        if (result.extracted_fields?.cnpj_emitente) setCnpjEmitente(maskCNPJ(result.extracted_fields.cnpj_emitente));
+        
+        // Verificar duplicata por número da nota + CNPJ
+        if (result.extracted_fields?.numero_nota && result.extracted_fields?.cnpj_emitente) {
+          const duplicataNota = await checkDuplicateByNotaCnpj(
+            result.extracted_fields.numero_nota, 
+            result.extracted_fields.cnpj_emitente
+          );
+          if (duplicataNota) {
+            setDuplicata(duplicataNota);
+            toast({ 
+              title: 'Possível nota duplicada', 
+              description: 'Uma nota com mesmo número e CNPJ já existe no sistema', 
+              variant: 'default' 
+            });
+          }
+        }
+        
         toast({ title: 'Nota fiscal processada!', description: 'Campos preenchidos automaticamente' });
       }
     } catch (error) {
@@ -176,10 +263,11 @@ export function ImportarNota({ onSuccess }: ImportarNotaProps) {
       setAiError(true);
     } finally {
       setProcessing(false);
+      setCheckingDuplicate(false);
     }
   };
 
-  const canProceedUpload = file && fileUrl && !uploading && !processing;
+  const canProceedUpload = file && fileUrl && !uploading && !processing && !(duplicata?.tipo === 'hash');
   const canProceedForm = form.empresa_id && form.justificativa.trim().length > 0 && form.valor_solicitado > 0;
 
   const handleSubmit = async () => {
@@ -205,6 +293,7 @@ export function ImportarNota({ onSuccess }: ImportarNotaProps) {
           categoria: form.categoria || null,
           descricao_compra: descricaoCompra || null,
           upload_nota_fiscal_url: fileUrl,
+          arquivo_hash: fileHash,
           data_emissao_nota: dataEmissao || null,
           numero_nota: numeroNota || null,
           nome_emitente: nomeEmitente || null,
@@ -264,8 +353,10 @@ export function ImportarNota({ onSuccess }: ImportarNotaProps) {
   const resetImport = () => {
     setFile(null);
     setFileUrl(null);
+    setFileHash(null);
     setAiResult(null);
     setAiError(false);
+    setDuplicata(null);
     setDataEmissao('');
     setNumeroNota('');
     setNomeEmitente('');
@@ -318,9 +409,15 @@ export function ImportarNota({ onSuccess }: ImportarNotaProps) {
           <div className="space-y-4">
             <div className={cn(
               "border-2 border-dashed rounded-lg p-8 text-center transition-colors",
+              duplicata?.tipo === 'hash' ? "border-destructive bg-destructive/5" :
               file ? "border-success bg-success/5" : "border-border hover:border-primary/50"
             )}>
-              {uploading || processing ? (
+              {checkingDuplicate ? (
+                <div className="flex flex-col items-center gap-2">
+                  <Loader2 className="h-10 w-10 animate-spin text-primary" />
+                  <p className="text-sm text-muted-foreground">Verificando duplicatas...</p>
+                </div>
+              ) : uploading || processing ? (
                 <div className="flex flex-col items-center gap-2">
                   <Loader2 className="h-10 w-10 animate-spin text-primary" />
                   <p className="text-sm text-muted-foreground">
@@ -329,7 +426,7 @@ export function ImportarNota({ onSuccess }: ImportarNotaProps) {
                 </div>
               ) : file ? (
                 <div className="flex flex-col items-center gap-2">
-                  <FileText className="h-10 w-10 text-success" />
+                  <FileText className={cn("h-10 w-10", duplicata?.tipo === 'hash' ? "text-destructive" : "text-success")} />
                   <p className="font-medium">{file.name}</p>
                   <Button variant="ghost" size="sm" onClick={() => document.getElementById('import-file-input')?.click()}>
                     Trocar arquivo
@@ -350,6 +447,50 @@ export function ImportarNota({ onSuccess }: ImportarNotaProps) {
                 className="hidden"
               />
             </div>
+
+            {/* Alerta de duplicata por hash (bloqueia) */}
+            {duplicata?.tipo === 'hash' && (
+              <div className="p-4 rounded-lg bg-destructive/10 flex items-start gap-3">
+                <XCircle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="font-medium text-destructive">Este arquivo já foi importado!</p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {duplicata.nome_emitente && `Emitente: ${duplicata.nome_emitente}`}
+                    {duplicata.numero_nota && ` • Nota: ${duplicata.numero_nota}`}
+                    {duplicata.created_at && ` • Em: ${new Date(duplicata.created_at).toLocaleDateString('pt-BR')}`}
+                  </p>
+                  <Button 
+                    variant="link" 
+                    className="p-0 h-auto text-primary" 
+                    onClick={() => navigate(`/solicitacao/${duplicata.id}`)}
+                  >
+                    Ver solicitação existente →
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Alerta de duplicata por nota+cnpj (avisa mas permite) */}
+            {duplicata?.tipo === 'nota_cnpj' && (
+              <div className="p-4 rounded-lg bg-warning/10 flex items-start gap-3">
+                <AlertTriangle className="h-5 w-5 text-warning flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="font-medium text-warning">Possível nota duplicada</p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Uma nota com mesmo número e CNPJ já existe no sistema.
+                    {duplicata.nome_emitente && ` Emitente: ${duplicata.nome_emitente}`}
+                    {duplicata.created_at && ` • Em: ${new Date(duplicata.created_at).toLocaleDateString('pt-BR')}`}
+                  </p>
+                  <Button 
+                    variant="link" 
+                    className="p-0 h-auto text-primary" 
+                    onClick={() => navigate(`/solicitacao/${duplicata.id}`)}
+                  >
+                    Ver solicitação existente →
+                  </Button>
+                </div>
+              </div>
+            )}
 
             {aiResult && (
               <div className={cn(
