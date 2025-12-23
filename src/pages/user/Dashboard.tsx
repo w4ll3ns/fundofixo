@@ -91,7 +91,7 @@ export default function UserDashboard() {
             <p className="text-muted-foreground">Acompanhe suas solicitações de fundo fixo</p>
           </div>
           <Button asChild>
-            <Link to="/nova-solicitacao">
+            <Link to="/minhas-solicitacoes?tab=nova">
               <PlusCircle className="mr-2 h-4 w-4" />
               Nova Solicitação
             </Link>
@@ -143,7 +143,7 @@ export default function UserDashboard() {
             <div className="text-center py-8">
               <p className="text-muted-foreground mb-4">Você ainda não tem solicitações</p>
               <Button asChild>
-                <Link to="/nova-solicitacao">Criar primeira solicitação</Link>
+                <Link to="/minhas-solicitacoes?tab=nova">Criar primeira solicitação</Link>
               </Button>
             </div>
           ) : (
