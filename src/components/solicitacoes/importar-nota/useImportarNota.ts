@@ -76,6 +76,15 @@ export function useImportarNota() {
     });
   };
 
+  const sanitizeFileName = (fileName: string): string => {
+    return fileName
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '') // Remove diacríticos (acentos)
+      .replace(/[^a-zA-Z0-9._-]/g, '-') // Substitui caracteres especiais por hífen
+      .replace(/-+/g, '-') // Remove hífens duplicados
+      .replace(/^-|-$/g, ''); // Remove hífens no início/fim
+  };
+
   const calculateFileHash = async (file: File): Promise<string> => {
     const buffer = await file.arrayBuffer();
     const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
@@ -179,7 +188,8 @@ export function useImportarNota() {
       setCheckingDuplicate(false);
       setUploading(true);
 
-      const filePath = `${user?.id}/importados/${Date.now()}-${selectedFile.name}`;
+      const sanitizedName = sanitizeFileName(selectedFile.name);
+      const filePath = `${user?.id}/importados/${Date.now()}-${sanitizedName}`;
       
       const { error: uploadError } = await supabase.storage
         .from('notas-fiscais')
