@@ -11,6 +11,8 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { maskCNPJ } from '@/lib/masks';
 import { Plus, Pencil, Trash2, Search, Building2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface Empresa {
   id: string;
@@ -22,6 +24,7 @@ interface Empresa {
 
 export default function Empresas() {
   const { toast } = useToast();
+  const isMobile = useIsMobile();
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -136,7 +139,61 @@ export default function Empresas() {
               <Building2 className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
               <p className="text-muted-foreground">Nenhuma empresa encontrada</p>
             </div>
+          ) : isMobile ? (
+            // Mobile: Cards
+            <div className="divide-y divide-border">
+              {filtered.map((empresa) => (
+                <div key={empresa.id} className="p-4 space-y-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium truncate">{empresa.nome_fantasia}</p>
+                      <p className="text-sm text-muted-foreground font-mono">{maskCNPJ(empresa.cnpj)}</p>
+                    </div>
+                    <span className={cn(
+                      "px-2 py-1 rounded-full text-xs font-medium shrink-0",
+                      empresa.status ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground'
+                    )}>
+                      {empresa.status ? 'Ativo' : 'Inativo'}
+                    </span>
+                  </div>
+                  {empresa.unidade && (
+                    <p className="text-sm text-muted-foreground">Unidade: {empresa.unidade}</p>
+                  )}
+                  <div className="flex gap-2 pt-2">
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      className="flex-1 h-10"
+                      onClick={() => openEdit(empresa)}
+                    >
+                      <Pencil className="h-4 w-4 mr-2" />
+                      Editar
+                    </Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button size="sm" variant="outline" className="h-10 text-destructive hover:text-destructive">
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Excluir empresa?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Esta ação não pode ser desfeita. A empresa será removida permanentemente.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                          <AlertDialogAction onClick={() => handleDelete(empresa.id)}>Excluir</AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+                </div>
+              ))}
+            </div>
           ) : (
+            // Desktop: Table
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-muted/50">
@@ -155,7 +212,10 @@ export default function Empresas() {
                       <td className="py-3 px-4 text-sm">{maskCNPJ(empresa.cnpj)}</td>
                       <td className="py-3 px-4 text-sm">{empresa.unidade || '-'}</td>
                       <td className="py-3 px-4">
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${empresa.status ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground'}`}>
+                        <span className={cn(
+                          "px-2 py-1 rounded-full text-xs font-medium",
+                          empresa.status ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground'
+                        )}>
                           {empresa.status ? 'Ativo' : 'Inativo'}
                         </span>
                       </td>

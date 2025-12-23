@@ -11,6 +11,7 @@ import { formatCurrency, formatDate } from '@/lib/masks';
 import { ArrowUpDown, Search, FileText, Eye, Download, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ModalBaixaAdmin } from '@/components/admin/ModalBaixaAdmin';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface Solicitacao {
   id: string;
@@ -35,6 +36,7 @@ type SortOrder = 'asc' | 'desc';
 
 export default function BaixasPendentes() {
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const [solicitacoes, setSolicitacoes] = useState<Solicitacao[]>([]);
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
   const [loading, setLoading] = useState(true);
@@ -189,7 +191,6 @@ export default function BaixasPendentes() {
           </CardContent>
         </Card>
 
-        {/* Table */}
         <Card>
           <CardContent className="pt-6">
             {loading ? (
@@ -200,7 +201,68 @@ export default function BaixasPendentes() {
               <div className="text-center py-8 text-muted-foreground">
                 Nenhuma baixa pendente encontrada
               </div>
+            ) : isMobile ? (
+              // Mobile: Cards
+              <div className="divide-y divide-border -mx-6">
+                {filteredAndSorted.map((sol) => {
+                  const days = getDaysPending(sol.data_aprovacao);
+                  const isLate = days > 7;
+                  return (
+                    <div key={sol.id} className="p-4 space-y-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium truncate">{sol.empresas?.nome_fantasia || '-'}</p>
+                          <p className="text-sm text-muted-foreground truncate">{sol.profiles?.nome || '-'}</p>
+                        </div>
+                        <div className={cn(
+                          "inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium shrink-0",
+                          isLate ? "bg-destructive/10 text-destructive" : "bg-muted text-muted-foreground"
+                        )}>
+                          {isLate && <AlertTriangle className="h-3 w-3" />}
+                          {days}d
+                        </div>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        <div>
+                          <p className="text-muted-foreground">Solicitado</p>
+                          <p className="font-medium">{formatCurrency(sol.valor_solicitado)}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Entregue</p>
+                          <p className="font-medium">{formatCurrency(sol.valor_entregue || 0)}</p>
+                        </div>
+                      </div>
+                      
+                      <div className="text-sm text-muted-foreground">
+                        Aprovado em: {sol.data_aprovacao ? formatDate(sol.data_aprovacao) : '-'}
+                      </div>
+                      
+                      <div className="flex gap-2 pt-2">
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          className="flex-1 h-10"
+                          onClick={() => navigate(`/solicitacao/${sol.id}`)}
+                        >
+                          <Eye className="h-4 w-4 mr-2" />
+                          Ver
+                        </Button>
+                        <Button 
+                          size="sm"
+                          className="flex-1 h-10"
+                          onClick={() => handleOpenBaixa(sol)}
+                        >
+                          <Download className="h-4 w-4 mr-2" />
+                          Baixa
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             ) : (
+              // Desktop: Table
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
