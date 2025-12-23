@@ -243,29 +243,27 @@ export default function GestaoSaldo() {
                   return (
                     <div 
                       key={fundo.id} 
-                      className={`flex items-center justify-between p-4 rounded-lg border ${
+                      className={`flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 p-4 rounded-lg border ${
                         isLowBalance ? 'border-warning bg-warning/5' : 'border-border'
                       }`}
                     >
-                      <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
                         <div className="flex-shrink-0">
-                          <Wallet className={`h-8 w-8 ${isLowBalance ? 'text-warning' : 'text-primary'}`} />
+                          <Wallet className={`h-6 w-6 sm:h-8 sm:w-8 ${isLowBalance ? 'text-warning' : 'text-primary'}`} />
                         </div>
-                        <div>
-                          <p className="font-medium">
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium truncate">
                             {fundo.empresas?.nome_fantasia}
                             {fundo.empresas?.unidade && ` - ${fundo.empresas.unidade}`}
                           </p>
-                          <p className="text-sm text-muted-foreground">
-                            {isLowBalance && (
-                              <span className="text-warning mr-2">⚠ Saldo abaixo do mínimo</span>
-                            )}
-                          </p>
+                          {isLowBalance && (
+                            <p className="text-xs text-warning">⚠ Saldo abaixo do mínimo</p>
+                          )}
                         </div>
                       </div>
-                      <div className="flex items-center gap-4">
-                        <div className="text-right">
-                          <p className={`text-xl font-bold ${isLowBalance ? 'text-warning' : ''}`}>
+                      <div className="flex items-center justify-between sm:justify-end gap-3 sm:gap-4">
+                        <div className="text-left sm:text-right">
+                          <p className={`text-lg sm:text-xl font-bold ${isLowBalance ? 'text-warning' : ''}`}>
                             {formatCurrency(fundo.saldo_atual)}
                           </p>
                           {fundo.saldo_minimo_alerta && (
