@@ -5,21 +5,22 @@ import { Card } from '@/components/ui/card';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { supabase } from '@/integrations/supabase/client';
 import { formatCurrency, formatDate } from '@/lib/masks';
-import { FileText, Clock, DollarSign, AlertTriangle, Wallet, XCircle } from 'lucide-react';
+import { FileText, Clock, DollarSign, AlertTriangle, Wallet, XCircle, CheckCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 
 export default function AdminDashboard() {
-  const [stats, setStats] = useState({ aguardando: 0, ajustes: 0, iaFalhou: 0, saldoTotal: 0 });
+  const [stats, setStats] = useState({ aguardando: 0, ajustes: 0, iaFalhou: 0, saldoTotal: 0, aguardandoBaixa: 0 });
   const [recentSolicitacoes, setRecentSolicitacoes] = useState<any[]>([]);
 
   useEffect(() => {
     const fetchData = async () => {
-      const [aguardandoRes, ajustesRes, iaFalouRes, fundosRes, solicitacoesRes] = await Promise.all([
+      const [aguardandoRes, ajustesRes, iaFalouRes, fundosRes, aguardandoBaixaRes, solicitacoesRes] = await Promise.all([
         supabase.from('solicitacoes').select('*', { count: 'exact', head: true }).eq('status', 'enviada'),
         supabase.from('solicitacoes').select('*', { count: 'exact', head: true }).eq('status', 'pendente_ajuste'),
         supabase.from('solicitacoes').select('*', { count: 'exact', head: true }).eq('ai_status', 'falhou'),
         supabase.from('fundos').select('saldo_atual'),
+        supabase.from('solicitacoes').select('*', { count: 'exact', head: true }).eq('status', 'entregue'),
         supabase.from('solicitacoes')
           .select('id, valor_solicitado, status, created_at, empresas(nome_fantasia), profiles:solicitante_user_id(nome)')
           .order('created_at', { ascending: false })
@@ -33,6 +34,7 @@ export default function AdminDashboard() {
         ajustes: ajustesRes.count || 0, 
         iaFalhou: iaFalouRes.count || 0,
         saldoTotal,
+        aguardandoBaixa: aguardandoBaixaRes.count || 0,
       });
       setRecentSolicitacoes(solicitacoesRes.data || []);
     };
@@ -44,9 +46,10 @@ export default function AdminDashboard() {
       <div className="space-y-6 animate-fade-in">
         <h1 className="text-2xl font-bold">Dashboard Administrativo</h1>
 
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
           <StatCard title="Saldo Total Disponível" value={formatCurrency(stats.saldoTotal)} icon={<Wallet className="h-5 w-5" />} variant="success" />
           <StatCard title="Aguardando Aprovação" value={stats.aguardando} icon={<Clock className="h-5 w-5" />} variant="primary" />
+          <StatCard title="Aguardando Baixa" value={stats.aguardandoBaixa} icon={<CheckCircle className="h-5 w-5" />} variant="default" />
           <StatCard title="Pendentes de Ajuste" value={stats.ajustes} icon={<AlertTriangle className="h-5 w-5" />} variant="warning" />
           <StatCard title="IA Falhou" value={stats.iaFalhou} icon={<XCircle className="h-5 w-5" />} variant="destructive" />
         </div>
