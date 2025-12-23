@@ -95,6 +95,7 @@ export function ImportarNota({ onSuccess }: ImportarNotaProps) {
   const [submitting, setSubmitting] = useState(false);
   const [duplicata, setDuplicata] = useState<DuplicataInfo | null>(null);
   const [checkingDuplicate, setCheckingDuplicate] = useState(false);
+  const [consultandoCnpj, setConsultandoCnpj] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -163,6 +164,35 @@ export function ImportarNota({ onSuccess }: ImportarNotaProps) {
       return { ...data[0], tipo: 'nota_cnpj' };
     }
     return null;
+  };
+
+  const consultarCnpjApi = async (cnpj: string): Promise<void> => {
+    if (!cnpj || cnpj.replace(/\D/g, '').length !== 14) return;
+
+    setConsultandoCnpj(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('consultar-cnpj', {
+        body: { cnpj: cnpj.replace(/\D/g, '') }
+      });
+
+      if (error) {
+        console.error('Erro ao consultar CNPJ:', error);
+        return;
+      }
+
+      if (data?.data?.razao_social) {
+        setNomeEmitente(data.data.razao_social);
+        toast({ 
+          title: 'Fornecedor identificado', 
+          description: `${data.data.razao_social}${data.source === 'cache' ? ' (cache)' : ''}` 
+        });
+      }
+    } catch (error) {
+      console.error('Erro ao consultar API de CNPJ:', error);
+      // Mantém o nome extraído pela IA em caso de erro
+    } finally {
+      setConsultandoCnpj(false);
+    }
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -239,6 +269,12 @@ export function ImportarNota({ onSuccess }: ImportarNotaProps) {
         if (result.extracted_fields?.numero_nota) setNumeroNota(result.extracted_fields.numero_nota);
         if (result.extracted_fields?.nome_emitente) setNomeEmitente(result.extracted_fields.nome_emitente);
         if (result.extracted_fields?.cnpj_emitente) setCnpjEmitente(maskCNPJ(result.extracted_fields.cnpj_emitente));
+        
+        // Consultar ReceitaWS para obter nome correto do fornecedor
+        if (result.extracted_fields?.cnpj_emitente) {
+          // Não aguarda para não bloquear o fluxo
+          consultarCnpjApi(result.extracted_fields.cnpj_emitente);
+        }
         
         // Verificar duplicata por número da nota + CNPJ
         if (result.extracted_fields?.numero_nota && result.extracted_fields?.cnpj_emitente) {
@@ -597,6 +633,37 @@ export function ImportarNota({ onSuccess }: ImportarNotaProps) {
                 rows={3}
               />
             </div>
+
+            {/* Dados do Fornecedor */}
+            {(nomeEmitente || cnpjEmitente) && (
+              <div className="p-3 rounded-lg border border-border bg-muted/30 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">Fornecedor</span>
+                  {consultandoCnpj && (
+                    <span className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      Consultando CNPJ...
+                    </span>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Nome/Razão Social</Label>
+                    <Input
+                      value={nomeEmitente}
+                      onChange={(e) => setNomeEmitente(e.target.value)}
+                      placeholder="Nome do fornecedor"
+                    />
+                  </div>
+                  {cnpjEmitente && (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <span>CNPJ:</span>
+                      <span className="font-mono">{cnpjEmitente}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label>Descrição da Compra</Label>

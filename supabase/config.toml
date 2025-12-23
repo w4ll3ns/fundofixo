@@ -2,3 +2,6 @@ project_id = "ynzfdujjzwskqwafpgyh"
 
 [functions.leitor-notas]
 verify_jwt = false
+
+[functions.consultar-cnpj]
+verify_jwt = false
