@@ -10,6 +10,7 @@ import UserDashboard from "./pages/user/Dashboard";
 import MinhasSolicitacoes from "./pages/user/MinhasSolicitacoes";
 import DetalhesSolicitacao from "./pages/user/DetalhesSolicitacao";
 import Baixa from "./pages/user/Baixa";
+import RelatoriosConsultivo from "./pages/user/RelatoriosConsultivo";
 import AdminDashboard from "./pages/admin/Dashboard";
 import Empresas from "./pages/admin/Empresas";
 import AdminSolicitacoes from "./pages/admin/Solicitacoes";
@@ -54,6 +55,7 @@ function AppRoutes() {
       <Route path="/solicitacao/:id" element={<ProtectedRoute><DetalhesSolicitacao /></ProtectedRoute>} />
       <Route path="/baixa/:id" element={<ProtectedRoute><Baixa /></ProtectedRoute>} />
       <Route path="/perfil" element={<ProtectedRoute><Perfil /></ProtectedRoute>} />
+      <Route path="/relatorios" element={<ProtectedRoute><RelatoriosConsultivo /></ProtectedRoute>} />
       
       {/* Admin routes */}
       <Route path="/admin" element={<ProtectedRoute adminOnly><AdminDashboard /></ProtectedRoute>} />

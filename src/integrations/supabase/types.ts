@@ -394,6 +394,38 @@ export type Database = {
         }
         Relationships: []
       }
+      usuario_empresa_acesso: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          empresa_id: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          empresa_id: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          empresa_id?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "usuario_empresa_acesso_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never

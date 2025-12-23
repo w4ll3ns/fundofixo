@@ -11,17 +11,21 @@ import {
 } from '@/components/ui/sheet';
 
 export function BottomNavigation() {
-  const { isAdmin } = useAuth();
+  const { isAdmin, hasConsultiveAccess } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [moreOpen, setMoreOpen] = useState(false);
 
-  const userItems = [
+  // User items - add Relatórios if has consultive access
+  const baseUserItems = [
     { icon: Home, label: 'Início', path: '/dashboard' },
     { icon: PlusCircle, label: 'Solicitar', path: '/nova-solicitacao' },
     { icon: FileText, label: 'Minhas', path: '/minhas-solicitacoes' },
-    { icon: User, label: 'Perfil', path: '/perfil' },
   ];
+
+  const userItems = hasConsultiveAccess
+    ? [...baseUserItems, { icon: BarChart3, label: 'Relatórios', path: '/relatorios' }, { icon: User, label: 'Perfil', path: '/perfil' }]
+    : [...baseUserItems, { icon: User, label: 'Perfil', path: '/perfil' }];
 
   const adminMainItems = [
     { icon: Home, label: 'Início', path: '/admin' },
