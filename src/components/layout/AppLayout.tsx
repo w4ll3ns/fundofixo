@@ -3,6 +3,7 @@ import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
+import { BottomNavigation } from './BottomNavigation';
 import { 
   Home, 
   PlusCircle, 
@@ -48,39 +49,29 @@ export function AppLayout({ children }: AppLayoutProps) {
   const menuItems = isAdmin ? adminMenuItems : userMenuItems;
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-border bg-card shadow-sm">
-        <div className="flex h-16 items-center justify-between px-4 lg:px-6">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="lg:hidden"
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            >
-              {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-            </Button>
-            <Link to={isAdmin ? '/admin' : '/dashboard'} className="flex items-center gap-2">
-              <Wallet className="h-7 w-7 text-primary" />
-              <span className="text-xl font-semibold text-foreground">Caixinha</span>
-            </Link>
-          </div>
+    <div className="min-h-screen bg-background flex flex-col">
+      {/* Header - Compact on mobile */}
+      <header className="sticky top-0 z-50 border-b border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
+        <div className="flex h-14 lg:h-16 items-center justify-between px-4 lg:px-6">
+          <Link to={isAdmin ? '/admin' : '/dashboard'} className="flex items-center gap-2">
+            <Wallet className="h-6 w-6 lg:h-7 lg:w-7 text-primary" />
+            <span className="text-lg lg:text-xl font-semibold text-foreground">Caixinha</span>
+          </Link>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 lg:gap-3">
             <NotificationBell />
-            <div className="hidden sm:block text-sm text-muted-foreground">
+            <div className="hidden sm:block text-sm text-muted-foreground max-w-32 truncate">
               {user?.email}
             </div>
-            <Button variant="ghost" size="icon" onClick={handleSignOut}>
+            <Button variant="ghost" size="icon" onClick={handleSignOut} className="h-9 w-9">
               <LogOut className="h-5 w-5" />
             </Button>
           </div>
         </div>
       </header>
 
-      <div className="flex">
-        {/* Sidebar - Desktop */}
+      <div className="flex flex-1">
+        {/* Sidebar - Desktop only */}
         <aside className="hidden lg:flex w-64 flex-col border-r border-border bg-card min-h-[calc(100vh-4rem)]">
           <nav className="flex-1 p-4 space-y-1">
             {menuItems.map((item) => (
@@ -111,38 +102,14 @@ export function AppLayout({ children }: AppLayoutProps) {
           </div>
         </aside>
 
-        {/* Mobile Menu */}
-        {mobileMenuOpen && (
-          <div className="fixed inset-0 z-40 lg:hidden">
-            <div className="fixed inset-0 bg-foreground/20 backdrop-blur-sm" onClick={() => setMobileMenuOpen(false)} />
-            <aside className="fixed left-0 top-16 bottom-0 w-64 bg-card border-r border-border animate-slide-in-right">
-              <nav className="p-4 space-y-1">
-                {menuItems.map((item) => (
-                  <Link
-                    key={item.path}
-                    to={item.path}
-                    onClick={() => setMobileMenuOpen(false)}
-                    className={cn(
-                      'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
-                      location.pathname === item.path
-                        ? 'bg-primary text-primary-foreground'
-                        : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-                    )}
-                  >
-                    <item.icon className="h-5 w-5" />
-                    {item.label}
-                  </Link>
-                ))}
-              </nav>
-            </aside>
-          </div>
-        )}
-
         {/* Main Content */}
-        <main className="flex-1 p-4 lg:p-6">
+        <main className="flex-1 p-4 lg:p-6 pb-20 lg:pb-6 overflow-y-auto">
           {children}
         </main>
       </div>
+
+      {/* Bottom Navigation - Mobile only */}
+      <BottomNavigation />
     </div>
   );
 }

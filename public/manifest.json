@@ -1,0 +1,17 @@
+{
+  "name": "Caixinha",
+  "short_name": "Caixinha",
+  "description": "Sistema de controle de fundo fixo e solicitações de pagamento",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#1e40af",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "64x64",
+      "type": "image/x-icon"
+    }
+  ]
+}
