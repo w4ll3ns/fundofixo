@@ -6,12 +6,14 @@ import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { NotaFiscalPreview } from '@/components/solicitacoes/NotaFiscalPreview';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import { formatCurrency, formatDate } from '@/lib/masks';
 import { ArrowLeft, Loader2, FileText, Building2, Calendar, DollarSign, Receipt, Bot } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
 interface Solicitacao {
   id: string;
+  solicitante_user_id: string;
   valor_solicitado: number;
   valor_entregue: number | null;
   valor_gasto_real: number | null;
@@ -41,6 +43,7 @@ interface Solicitacao {
 export default function DetalhesSolicitacao() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user, hasConsultiveAccess } = useAuth();
   const [solicitacao, setSolicitacao] = useState<Solicitacao | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -50,7 +53,7 @@ export default function DetalhesSolicitacao() {
       const { data } = await supabase
         .from('solicitacoes')
         .select(`
-          id, valor_solicitado, valor_entregue, valor_gasto_real, troco_real, status, 
+          id, solicitante_user_id, valor_solicitado, valor_entregue, valor_gasto_real, troco_real, status, 
           created_at, data_aprovacao, data_baixa, justificativa, categoria, 
           motivo_rejeicao, observacoes_admin, forma_entrega, descricao_compra, 
           upload_nota_fiscal_url, data_emissao_nota, numero_nota, nome_emitente, cnpj_emitente,
@@ -89,7 +92,9 @@ export default function DetalhesSolicitacao() {
     );
   }
 
-  const canDoBaixa = solicitacao.status === 'entregue' || solicitacao.status === 'pendente_ajuste';
+  // Check if current user is the owner (not consultivo viewing)
+  const isOwner = user?.id === solicitacao.solicitante_user_id;
+  const canDoBaixa = isOwner && (solicitacao.status === 'entregue' || solicitacao.status === 'pendente_ajuste');
 
   return (
     <AppLayout>
