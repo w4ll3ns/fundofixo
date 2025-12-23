@@ -21,7 +21,7 @@ interface DominioEmail {
 
 const dominioSchema = z.string()
   .min(3, 'Domínio deve ter pelo menos 3 caracteres')
-  .regex(/^[a-zA-Z0-9][a-zA-Z0-9-]*\.[a-zA-Z]{2,}$/, 'Formato de domínio inválido (ex: empresa.com.br)');
+  .regex(/^[a-zA-Z0-9][a-zA-Z0-9-]*(\.[a-zA-Z0-9-]+)+$/, 'Formato de domínio inválido (ex: empresa.com.br)');
 
 export default function DominiosEmail() {
   const { toast } = useToast();
