@@ -9,11 +9,6 @@ import {
 } from "lucide-react";
 import { StatCard } from "@/components/ui/stat-card";
 import {
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-} from "@/components/ui/chart";
-import {
   PieChart,
   Pie,
   Cell,
@@ -23,6 +18,7 @@ import {
   YAxis,
   CartesianGrid,
   ResponsiveContainer,
+  Tooltip,
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { Tables } from "@/integrations/supabase/types";
@@ -163,12 +159,13 @@ export default function ResumoGeral({ solicitacoes }: ResumoGeralProps) {
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
-                  <ChartTooltip
-                    content={
-                      <ChartTooltipContent
-                        formatter={(value) => [`${value} solicitações`, ""]}
-                      />
-                    }
+                  <Tooltip
+                    formatter={(value: number) => [`${value} solicitações`, "Quantidade"]}
+                    contentStyle={{
+                      backgroundColor: "hsl(var(--card))",
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: "0.5rem",
+                    }}
                   />
                 </PieChart>
               </ResponsiveContainer>
@@ -203,12 +200,13 @@ export default function ResumoGeral({ solicitacoes }: ResumoGeralProps) {
                     tick={{ fontSize: 12 }}
                     className="text-muted-foreground"
                   />
-                  <ChartTooltip
-                    content={
-                      <ChartTooltipContent
-                        formatter={(value) => [formatCurrency(Number(value)), "Valor"]}
-                      />
-                    }
+                  <Tooltip
+                    formatter={(value: number) => [formatCurrency(value), "Valor"]}
+                    contentStyle={{
+                      backgroundColor: "hsl(var(--card))",
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: "0.5rem",
+                    }}
                   />
                   <Line
                     type="monotone"

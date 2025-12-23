@@ -6,8 +6,8 @@ import {
   YAxis,
   CartesianGrid,
   ResponsiveContainer,
+  Tooltip,
 } from "recharts";
-import { ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -126,12 +126,13 @@ export default function RelatorioPorEmpresa({
                     width={100}
                     className="text-muted-foreground"
                   />
-                  <ChartTooltip
-                    content={
-                      <ChartTooltipContent
-                        formatter={(value) => [formatCurrency(Number(value)), "Valor"]}
-                      />
-                    }
+                  <Tooltip
+                    formatter={(value: number) => [formatCurrency(value), "Valor"]}
+                    contentStyle={{
+                      backgroundColor: "hsl(var(--card))",
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: "0.5rem",
+                    }}
                   />
                   <Bar
                     dataKey="valor"
