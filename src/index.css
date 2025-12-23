@@ -111,7 +111,53 @@
     @apply border-border;
   }
 
+  html {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+  }
+
   body {
     @apply bg-background text-foreground;
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+/* Safe area padding for iOS devices with notch */
+@layer utilities {
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  
+  .safe-area-top {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+  
+  .touch-manipulation {
+    touch-action: manipulation;
+  }
+}
+
+/* Mobile optimizations */
+@media (max-width: 768px) {
+  /* Larger touch targets */
+  button, 
+  a, 
+  [role="button"] {
+    min-height: 44px;
+  }
+  
+  /* Smooth scrolling */
+  .overflow-y-auto,
+  .overflow-x-auto {
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  /* Prevent text selection on interactive elements */
+  button,
+  a {
+    -webkit-user-select: none;
+    user-select: none;
   }
 }
