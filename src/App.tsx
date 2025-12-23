@@ -16,6 +16,7 @@ import AdminSolicitacoes from "./pages/admin/Solicitacoes";
 import GestaoSaldo from "./pages/admin/GestaoSaldo";
 import BaixasPendentes from "./pages/admin/BaixasPendentes";
 import Configuracoes from "./pages/admin/Configuracoes";
+import Relatorios from "./pages/admin/Relatorios";
 import Perfil from "./pages/Perfil";
 import NotFound from "./pages/NotFound";
 
@@ -61,6 +62,7 @@ function AppRoutes() {
       <Route path="/admin/gestao-saldo" element={<ProtectedRoute adminOnly><GestaoSaldo /></ProtectedRoute>} />
       <Route path="/admin/configuracoes" element={<ProtectedRoute adminOnly><Configuracoes /></ProtectedRoute>} />
       <Route path="/admin/baixas-pendentes" element={<ProtectedRoute adminOnly><BaixasPendentes /></ProtectedRoute>} />
+      <Route path="/admin/relatorios" element={<ProtectedRoute adminOnly><Relatorios /></ProtectedRoute>} />
       
       <Route path="*" element={<NotFound />} />
     </Routes>
