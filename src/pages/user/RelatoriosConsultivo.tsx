@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Download, FileSpreadsheet, BarChart3, Building2 } from "lucide-react";
+import { Download, FileSpreadsheet, BarChart3, Building2, List } from "lucide-react";
 import { format, parseISO, isAfter, isBefore, startOfDay, endOfDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
@@ -14,10 +14,11 @@ import FiltrosPeriodo, { FiltrosState } from "@/components/relatorios/FiltrosPer
 import ResumoGeral from "@/components/relatorios/ResumoGeral";
 import RelatorioPorEmpresa from "@/components/relatorios/RelatorioPorEmpresa";
 import RelatorioPorUsuario from "@/components/relatorios/RelatorioPorUsuario";
+import { ListaSolicitacoesConsultivo } from "@/components/solicitacoes/ListaSolicitacoesConsultivo";
 
 export default function RelatoriosConsultivo() {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState("geral");
+  const [activeTab, setActiveTab] = useState("solicitacoes");
   const [filtros, setFiltros] = useState<FiltrosState>({
     dataInicio: undefined,
     dataFim: undefined,
@@ -238,7 +239,7 @@ export default function RelatoriosConsultivo() {
         {/* Tabs */}
         {isLoading ? (
           <div className="space-y-4">
-            <Skeleton className="h-10 w-[400px]" />
+            <Skeleton className="h-10 w-[500px]" />
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               {[...Array(4)].map((_, i) => (
                 <Skeleton key={i} className="h-32" />
@@ -251,11 +252,24 @@ export default function RelatoriosConsultivo() {
           </div>
         ) : (
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid w-full grid-cols-3 lg:w-[400px]">
+            <TabsList className="grid w-full grid-cols-4 lg:w-[500px]">
+              <TabsTrigger value="solicitacoes" className="gap-2">
+                <List className="h-4 w-4" />
+                Solicitações
+              </TabsTrigger>
               <TabsTrigger value="geral">Visão Geral</TabsTrigger>
               <TabsTrigger value="empresa">Por Empresa</TabsTrigger>
               <TabsTrigger value="usuario">Por Usuário</TabsTrigger>
             </TabsList>
+
+            <TabsContent value="solicitacoes" className="mt-6">
+              <ListaSolicitacoesConsultivo
+                solicitacoes={solicitacoes}
+                empresas={empresas}
+                profiles={profiles}
+                loading={loadingSolicitacoes}
+              />
+            </TabsContent>
 
             <TabsContent value="geral" className="mt-6">
               <ResumoGeral solicitacoes={filteredSolicitacoes} />
