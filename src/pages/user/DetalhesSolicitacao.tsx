@@ -4,9 +4,11 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/status-badge';
+import { NotaFiscalPreview } from '@/components/solicitacoes/NotaFiscalPreview';
 import { supabase } from '@/integrations/supabase/client';
 import { formatCurrency, formatDate } from '@/lib/masks';
-import { ArrowLeft, Loader2, FileText, Building2, Calendar, User, DollarSign } from 'lucide-react';
+import { ArrowLeft, Loader2, FileText, Building2, Calendar, DollarSign, Receipt, Bot } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 
 interface Solicitacao {
   id: string;
@@ -25,6 +27,13 @@ interface Solicitacao {
   forma_entrega: string | null;
   descricao_compra: string | null;
   upload_nota_fiscal_url: string | null;
+  data_emissao_nota: string | null;
+  numero_nota: string | null;
+  nome_emitente: string | null;
+  cnpj_emitente: string | null;
+  ai_valor_extraido: number | null;
+  ai_confianca: 'alta' | 'media' | 'baixa' | null;
+  ai_status: 'pendente' | 'processado' | 'erro' | null;
   empresas: { nome_fantasia: string } | null;
   profiles: { nome: string } | null;
 }
@@ -44,7 +53,9 @@ export default function DetalhesSolicitacao() {
           id, valor_solicitado, valor_entregue, valor_gasto_real, troco_real, status, 
           created_at, data_aprovacao, data_baixa, justificativa, categoria, 
           motivo_rejeicao, observacoes_admin, forma_entrega, descricao_compra, 
-          upload_nota_fiscal_url, empresas(nome_fantasia), profiles:solicitante_user_id(nome)
+          upload_nota_fiscal_url, data_emissao_nota, numero_nota, nome_emitente, cnpj_emitente,
+          ai_valor_extraido, ai_confianca, ai_status,
+          empresas(nome_fantasia), profiles:solicitante_user_id(nome)
         `)
         .eq('id', id)
         .maybeSingle();
@@ -199,6 +210,69 @@ export default function DetalhesSolicitacao() {
               <div className="p-4 rounded-lg bg-destructive/10">
                 <p className="text-sm text-muted-foreground mb-1">Motivo da Rejeição</p>
                 <p className="text-destructive">{solicitacao.motivo_rejeicao}</p>
+              </div>
+            )}
+
+            {/* Nota Fiscal Section */}
+            {solicitacao.upload_nota_fiscal_url && (
+              <div className="space-y-4 pt-4 border-t">
+                <div className="flex items-center gap-2">
+                  <Receipt className="h-5 w-5 text-primary" />
+                  <h3 className="font-semibold">Nota Fiscal Anexada</h3>
+                </div>
+
+                {/* AI Extracted Data */}
+                {(solicitacao.numero_nota || solicitacao.nome_emitente || solicitacao.ai_valor_extraido) && (
+                  <div className="p-4 rounded-lg bg-muted/50 space-y-3">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Bot className="h-4 w-4" />
+                      <span>Dados extraídos automaticamente</span>
+                      {solicitacao.ai_confianca && (
+                        <Badge variant={
+                          solicitacao.ai_confianca === 'alta' ? 'default' :
+                          solicitacao.ai_confianca === 'media' ? 'secondary' : 'destructive'
+                        }>
+                          Confiança {solicitacao.ai_confianca}
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      {solicitacao.numero_nota && (
+                        <div>
+                          <p className="text-xs text-muted-foreground">Número da Nota</p>
+                          <p className="font-medium">{solicitacao.numero_nota}</p>
+                        </div>
+                      )}
+                      {solicitacao.data_emissao_nota && (
+                        <div>
+                          <p className="text-xs text-muted-foreground">Data de Emissão</p>
+                          <p className="font-medium">{formatDate(solicitacao.data_emissao_nota)}</p>
+                        </div>
+                      )}
+                      {solicitacao.nome_emitente && (
+                        <div>
+                          <p className="text-xs text-muted-foreground">Emitente</p>
+                          <p className="font-medium">{solicitacao.nome_emitente}</p>
+                        </div>
+                      )}
+                      {solicitacao.cnpj_emitente && (
+                        <div>
+                          <p className="text-xs text-muted-foreground">CNPJ Emitente</p>
+                          <p className="font-medium">{solicitacao.cnpj_emitente}</p>
+                        </div>
+                      )}
+                      {solicitacao.ai_valor_extraido && (
+                        <div>
+                          <p className="text-xs text-muted-foreground">Valor Extraído (IA)</p>
+                          <p className="font-medium">{formatCurrency(solicitacao.ai_valor_extraido)}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* File Preview */}
+                <NotaFiscalPreview filePath={solicitacao.upload_nota_fiscal_url} />
               </div>
             )}
 
