@@ -12,7 +12,8 @@ import {
   BarChart3, 
   LogOut,
   Wallet,
-  ClipboardCheck
+  ClipboardCheck,
+  Settings
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -43,6 +44,7 @@ export function AppLayout({ children }: AppLayoutProps) {
     { icon: FileText, label: 'Solicitações', path: '/admin/solicitacoes' },
     { icon: ClipboardCheck, label: 'Baixas Pendentes', path: '/admin/baixas-pendentes' },
     { icon: BarChart3, label: 'Relatórios', path: '/admin/relatorios' },
+    { icon: Settings, label: 'Configurações', path: '/admin/configuracoes' },
     // Admin's own requests - unified page
     { icon: PlusCircle, label: 'Minhas Solicitações', path: '/minhas-solicitacoes' },
   ];
