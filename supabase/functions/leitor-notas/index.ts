@@ -13,6 +13,9 @@ serve(async (req) => {
   try {
     const { file_base64, file_type } = await req.json();
 
+    console.log('Received request with file_type:', file_type);
+    console.log('Base64 prefix:', file_base64?.substring(0, 50));
+
     if (!file_base64) {
       return new Response(
         JSON.stringify({ error: 'Arquivo não fornecido' }),
@@ -29,9 +32,14 @@ serve(async (req) => {
       );
     }
 
-    console.log('Processing invoice with AI...');
+    // Detect file type from base64 or file_type parameter
+    const isPDF = file_type === 'application/pdf' || 
+                  file_base64.startsWith('data:application/pdf') ||
+                  file_base64.includes('application/pdf');
+    
+    console.log('File type detection - isPDF:', isPDF);
 
-    const systemPrompt = `Você é um especialista em leitura de notas fiscais brasileiras. Analise a imagem/documento fornecido e extraia as seguintes informações:
+    const systemPrompt = `Você é um especialista em leitura de notas fiscais brasileiras. Analise o documento fornecido e extraia as seguintes informações:
 
 1. VALOR TOTAL - Este é o mais importante. Procure por:
    - "TOTAL", "VALOR TOTAL", "TOTAL A PAGAR", "VALOR A PAGAR", "TOTAL GERAL"
@@ -64,6 +72,60 @@ Regras de confiança:
 - MEDIA: encontrou um valor que parece ser o total mas sem keyword clara
 - BAIXA: não tem certeza ou encontrou múltiplos candidatos`;
 
+    // Extract base64 data without prefix if present
+    let base64Data = file_base64;
+    let mimeType = file_type || 'image/jpeg';
+    
+    if (file_base64.includes(',')) {
+      const parts = file_base64.split(',');
+      base64Data = parts[1];
+      // Extract mime type from data URL
+      const mimeMatch = parts[0].match(/data:([^;]+)/);
+      if (mimeMatch) {
+        mimeType = mimeMatch[1];
+      }
+    }
+
+    console.log('Detected MIME type:', mimeType);
+    console.log('Base64 data length:', base64Data?.length);
+
+    // Build the correct content format based on file type
+    let userContent;
+    
+    if (isPDF) {
+      console.log('Processing as PDF document');
+      // For PDFs, use inline_data format which Gemini supports
+      userContent = [
+        {
+          type: 'text',
+          text: 'Analise esta nota fiscal em PDF e extraia os dados solicitados. Retorne apenas o JSON, sem markdown.'
+        },
+        {
+          type: 'image_url',
+          image_url: {
+            url: `data:application/pdf;base64,${base64Data}`
+          }
+        }
+      ];
+    } else {
+      console.log('Processing as image');
+      // For images, use standard image_url format
+      userContent = [
+        {
+          type: 'text',
+          text: 'Analise esta nota fiscal e extraia os dados solicitados. Retorne apenas o JSON, sem markdown.'
+        },
+        {
+          type: 'image_url',
+          image_url: {
+            url: file_base64.includes('data:') ? file_base64 : `data:${mimeType};base64,${base64Data}`
+          }
+        }
+      ];
+    }
+
+    console.log('Sending request to AI Gateway...');
+
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -71,23 +133,12 @@ Regras de confiança:
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
+        model: 'google/gemini-2.5-pro', // Using Pro for better PDF support
         messages: [
           { role: 'system', content: systemPrompt },
           {
             role: 'user',
-            content: [
-              {
-                type: 'text',
-                text: 'Analise esta nota fiscal e extraia os dados solicitados. Retorne apenas o JSON, sem markdown.'
-              },
-              {
-                type: 'image_url',
-                image_url: {
-                  url: file_base64
-                }
-              }
-            ]
+            content: userContent
           }
         ],
       }),
