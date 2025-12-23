@@ -9,8 +9,7 @@ import { StatusBadge } from '@/components/ui/status-badge';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatCurrency, formatDate } from '@/lib/masks';
-import { Search, Eye, FileUp } from 'lucide-react';
-import { ModalImportarNota } from '@/components/user/ModalImportarNota';
+import { Search, Eye } from 'lucide-react';
 
 type StatusType = 'enviada' | 'aprovada' | 'entregue' | 'rejeitada' | 'baixada' | 'pendente_ajuste';
 
@@ -31,7 +30,6 @@ export default function MinhasSolicitacoes() {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>(searchParams.get('status') || 'all');
   const [search, setSearch] = useState('');
-  const [importModalOpen, setImportModalOpen] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -65,10 +63,6 @@ export default function MinhasSolicitacoes() {
       <div className="space-y-6 animate-fade-in">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <h1 className="text-2xl font-bold">Minhas Solicitações</h1>
-          <Button variant="outline" onClick={() => setImportModalOpen(true)}>
-            <FileUp className="mr-2 h-4 w-4" />
-            Importar Nota
-          </Button>
         </div>
 
         <div className="flex flex-col sm:flex-row gap-4">
@@ -149,8 +143,6 @@ export default function MinhasSolicitacoes() {
             </div>
           )}
         </Card>
-
-        <ModalImportarNota open={importModalOpen} onOpenChange={setImportModalOpen} />
       </div>
     </AppLayout>
   );

@@ -11,8 +11,6 @@ import {
   Building2, 
   BarChart3, 
   LogOut,
-  Menu,
-  X,
   Wallet,
   ClipboardCheck
 } from 'lucide-react';
@@ -46,6 +44,9 @@ export function AppLayout({ children }: AppLayoutProps) {
     { icon: FileText, label: 'Solicitações', path: '/admin/solicitacoes' },
     { icon: ClipboardCheck, label: 'Baixas Pendentes', path: '/admin/baixas-pendentes' },
     { icon: BarChart3, label: 'Relatórios', path: '/admin/relatorios' },
+    // Admin's own requests
+    { icon: PlusCircle, label: 'Minha Solicitação', path: '/nova-solicitacao' },
+    { icon: FileText, label: 'Minhas Solicitações', path: '/minhas-solicitacoes' },
   ];
 
   const menuItems = isAdmin ? adminMenuItems : userMenuItems;
