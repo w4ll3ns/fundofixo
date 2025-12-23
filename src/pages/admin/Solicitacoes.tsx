@@ -35,6 +35,9 @@ interface Solicitacao {
   solicitante_user_id: string;
   empresas: { nome_fantasia: string } | null;
   profiles: { nome: string } | null;
+  nome_emitente: string | null;
+  cnpj_emitente: string | null;
+  upload_nota_fiscal_url: string | null;
 }
 
 interface Fundo {
@@ -66,7 +69,7 @@ export default function AdminSolicitacoes() {
   const fetchData = async () => {
     let query = supabase
       .from('solicitacoes')
-      .select('id, valor_solicitado, valor_entregue, status, created_at, justificativa, categoria, tipo_solicitacao, excedeu_saldo, excedeu_limite_maximo, empresa_id, solicitante_user_id, empresas(nome_fantasia), profiles:solicitante_user_id(nome)')
+      .select('id, valor_solicitado, valor_entregue, status, created_at, justificativa, categoria, tipo_solicitacao, excedeu_saldo, excedeu_limite_maximo, empresa_id, solicitante_user_id, nome_emitente, cnpj_emitente, upload_nota_fiscal_url, empresas(nome_fantasia), profiles:solicitante_user_id(nome)')
       .order('created_at', { ascending: false });
 
     if (statusFilter !== 'all') {
@@ -532,6 +535,40 @@ export default function AdminSolicitacoes() {
                   <p className="text-sm text-muted-foreground">Justificativa</p>
                   <p className="mt-1">{selectedSolicitacao.justificativa}</p>
                 </div>
+
+                {/* Dados do Fornecedor */}
+                {(selectedSolicitacao.nome_emitente || selectedSolicitacao.cnpj_emitente) && (
+                  <div className="pt-4 border-t border-border">
+                    <p className="text-sm font-medium mb-3">Dados do Fornecedor</p>
+                    <div className="grid grid-cols-2 gap-4">
+                      {selectedSolicitacao.nome_emitente && (
+                        <div className="col-span-2">
+                          <p className="text-sm text-muted-foreground">Nome/Razão Social</p>
+                          <p className="font-medium">{selectedSolicitacao.nome_emitente}</p>
+                        </div>
+                      )}
+                      {selectedSolicitacao.cnpj_emitente && (
+                        <div>
+                          <p className="text-sm text-muted-foreground">CNPJ</p>
+                          <p className="font-medium font-mono">
+                            {selectedSolicitacao.cnpj_emitente.replace(
+                              /^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/,
+                              '$1.$2.$3/$4-$5'
+                            )}
+                          </p>
+                        </div>
+                      )}
+                      {selectedSolicitacao.upload_nota_fiscal_url && (
+                        <div>
+                          <p className="text-sm text-muted-foreground">Nota Fiscal</p>
+                          <Badge variant="outline" className="text-success border-success">
+                            Anexada
+                          </Badge>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </DialogContent>

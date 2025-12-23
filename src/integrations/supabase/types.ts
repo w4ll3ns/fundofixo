@@ -44,6 +44,42 @@ export type Database = {
         }
         Relationships: []
       }
+      fornecedores: {
+        Row: {
+          atividade_principal: string | null
+          cnpj: string
+          consultado_em: string | null
+          created_at: string | null
+          endereco_completo: string | null
+          id: string
+          nome_fantasia: string | null
+          razao_social: string | null
+          situacao: string | null
+        }
+        Insert: {
+          atividade_principal?: string | null
+          cnpj: string
+          consultado_em?: string | null
+          created_at?: string | null
+          endereco_completo?: string | null
+          id?: string
+          nome_fantasia?: string | null
+          razao_social?: string | null
+          situacao?: string | null
+        }
+        Update: {
+          atividade_principal?: string | null
+          cnpj?: string
+          consultado_em?: string | null
+          created_at?: string | null
+          endereco_completo?: string | null
+          id?: string
+          nome_fantasia?: string | null
+          razao_social?: string | null
+          situacao?: string | null
+        }
+        Relationships: []
+      }
       fundos: {
         Row: {
           empresa_id: string
