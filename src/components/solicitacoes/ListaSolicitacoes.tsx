@@ -141,7 +141,14 @@ export function ListaSolicitacoes({ defaultStatusFilter }: ListaSolicitacoesProp
                     <p className="font-medium truncate">{sol.empresas?.nome_fantasia}</p>
                     <p className="text-xs text-muted-foreground">{formatDate(sol.created_at)}</p>
                   </div>
-                  <StatusBadge status={sol.status} />
+                  <div className="flex flex-col items-end gap-1">
+                    <StatusBadge status={sol.status} />
+                    {sol.status === 'entregue' && (sol.notas_count || 0) > 0 && (
+                      <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-primary/10 text-primary">
+                        Baixa parcial · {sol.notas_count}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 
                 <div className="grid grid-cols-2 gap-2 text-sm">
@@ -164,7 +171,9 @@ export function ListaSolicitacoes({ defaultStatusFilter }: ListaSolicitacoesProp
                 <div className="flex gap-2 pt-2">
                   {(sol.status === 'entregue' || sol.status === 'pendente_ajuste') && (
                     <Button size="sm" className="flex-1 h-10" asChild>
-                      <Link to={`/baixa/${sol.id}`}>Fazer Baixa</Link>
+                      <Link to={`/baixa/${sol.id}`}>
+                        {(sol.notas_count || 0) > 0 ? 'Continuar Baixa' : 'Fazer Baixa'}
+                      </Link>
                     </Button>
                   )}
                   <Button size="sm" variant="outline" className="flex-1 h-10" asChild>
