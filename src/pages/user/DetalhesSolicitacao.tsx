@@ -8,8 +8,9 @@ import { NotaFiscalPreview } from '@/components/solicitacoes/NotaFiscalPreview';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatCurrency, formatDate } from '@/lib/masks';
-import { ArrowLeft, Loader2, FileText, Building2, Calendar, DollarSign, Receipt, Bot } from 'lucide-react';
+import { ArrowLeft, Loader2, FileText, Building2, Calendar, DollarSign, Receipt, Bot, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { ModalExcluirBaixa } from '@/components/admin/ModalExcluirBaixa';
 
 interface Solicitacao {
   id: string;
