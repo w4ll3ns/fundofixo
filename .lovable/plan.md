@@ -1,45 +1,67 @@
-## Problema
+## Objetivo
 
-A solicitação de R$ 200,00 (id `a53bf676...`) foi finalizada como `baixada` mesmo tendo apenas 1 nota de R$ 110,60 anexada. Hoje a tela "Realizar Baixa" só tem **um botão "Confirmar Baixa"** que finaliza imediatamente — não há como o usuário **salvar o progresso** (anexar 1 nota agora, voltar mais tarde para anexar as demais).
+1. Reverter manualmente a baixa da solicitação de R$ 200 da Stefhane para que ela possa concluir a baixa corretamente.
+2. Criar uma ação reutilizável de **"Desfazer baixa"** disponível no painel admin para correções futuras em qualquer solicitação já baixada.
 
-Resultado: o usuário sente-se forçado a finalizar e o sistema marca como `baixada` sem checar se realmente o gasto bate com o entregue.
+---
 
-## Comportamento desejado
+## Parte 1 — Reversão pontual (Stefhane, R$ 200)
 
-Na tela de baixa do usuário (`/baixa/:id`), oferecer **dois caminhos**:
+Solicitação `a53bf676-...` está com:
+- `status = baixada`, `valor_gasto_real = 110,60`, `troco_real = 89,40`, `data_baixa = 27/04`
+- Histórico do fundo: saída de R$ 200 (entrega) + devolução de troco R$ 89,40
 
-1. **Salvar Rascunho** — anexa as notas adicionadas, mantém a solicitação como **pendente de baixa** (status fica `entregue` com indicação visual de "baixa parcial em andamento"). Usuário pode voltar e adicionar mais notas depois.
-2. **Finalizar Baixa** — só fica habilitado quando o total das notas ≥ valor entregue (ou usuário confirma que houve troco real a devolver). Mantém o fluxo atual (`baixada` ou `pendente_ajuste`).
+Migration única que executa de forma transacional:
+1. Estorna o troco no fundo: subtrai R$ 89,40 do `fundos.saldo_atual` da empresa correspondente.
+2. Insere registro em `historico_fundos` do tipo `ajuste` com descrição "Reversão de baixa para correção — solicitação Stefhane R$ 200" (saldo_anterior/posterior corretos).
+3. Atualiza a solicitação:
+   - `status` volta para `entregue`
+   - Limpa `data_baixa`, `valor_gasto_real`, `troco_real`
+   - Mantém intactos os registros já existentes em `solicitacao_notas` (viram rascunho automaticamente, conforme regra atual).
 
-Enquanto não finalizar, o sistema trata a solicitação como **pendente de baixa** com status visual "Baixa parcial" quando já houver notas salvas mas total < valor entregue.
+Resultado: a Stefhane volta a ver a solicitação na aba "Baixa pendente" com badge "Baixa parcial · N" e botão "Continuar Baixa", já com as notas que ela havia anexado.
 
-## Plano de implementação
+---
 
-### 1. Tela `src/pages/user/Baixa.tsx`
-- Buscar notas já existentes em `solicitacao_notas` ao carregar (para retomar rascunho).
-- Calcular `valorJaSalvo` (notas no banco) + `valorGastoNovo` (notas adicionadas na sessão).
-- Substituir o botão único por dois:
-  - **"Salvar Rascunho"** → insere apenas as notas novas em `solicitacao_notas`, NÃO atualiza `solicitacoes` (mantém status `entregue`), exibe toast "Rascunho salvo. Você pode voltar para finalizar".
-  - **"Finalizar Baixa"** → fluxo atual (atualiza `solicitacoes` com `status`, `valor_gasto_real`, `troco_real`, `data_baixa`, devolução de troco ao fundo). Confirmação obrigatória se total < entregue (avisa que troco será devolvido como diferença não gasta).
-- Mostrar banner "Você tem N nota(s) salva(s) totalizando R$ X. Adicione mais ou finalize a baixa." quando há rascunho.
-- Permitir excluir notas salvas (já há RLS para isso).
+## Parte 2 — Ação "Desfazer baixa" no painel admin
 
-### 2. Indicação visual de "baixa parcial" 
-Onde a lista de solicitações mostra status `entregue`, verificar se já existe pelo menos 1 nota em `solicitacao_notas` e mostrar badge adicional "Baixa parcial" (ex.: `src/pages/user/MinhasSolicitacoes.tsx` e admin equivalente).
+### UX
+- Em **`/admin/solicitacoes`**, no modal de detalhes (`Solicitacoes.tsx`), quando `status = baixada` ou `pendente_ajuste`, exibir um botão secundário destrutivo **"Desfazer baixa"** (ícone Undo2), visível apenas para admin.
+- Ao clicar, abre `AlertDialog` de confirmação explicando:
+  - A solicitação volta para o status **"entregue"** (baixa pendente).
+  - O troco devolvido (se houver) será **estornado do fundo fixo**.
+  - As notas fiscais já anexadas **permanecem** (como rascunho) para o usuário corrigir.
+  - Campo obrigatório: **motivo do desfazimento**.
+- Após confirmar, mostra toast de sucesso e atualiza a lista.
 
-- Buscar contagem de notas por solicitação (uma única query agregando) e exibir badge secundário quando count > 0 e status = `entregue`.
+### Lógica (client-side, dentro de `Solicitacoes.tsx`)
+Função `handleDesfazerBaixa(solicitacao, motivo)`:
+1. Busca `fundo` da `empresa_id` da solicitação.
+2. Se `troco_real > 0`:
+   - Atualiza `fundos.saldo_atual = saldo_atual - troco_real`.
+   - Insere `historico_fundos` (`tipo = 'ajuste'`, valor negativo, descrição "Desfazimento de baixa: {motivo} — admin {nome}", `saldo_anterior`/`saldo_posterior`, `solicitacao_id`, `admin_id`).
+3. Atualiza `solicitacoes`:
+   - `status = 'entregue'`
+   - `data_baixa = null`, `valor_gasto_real = null`, `troco_real = null`
+   - `observacoes_admin` recebe append: "[Baixa desfeita em {data} por {admin}: {motivo}]"
+4. Cria `notificacao` para `solicitante_user_id` com título "Baixa desfeita para correção" e link para `/baixa/{id}`.
 
-### 3. Componente `NotasFiscaisManager`
-Já suporta lista controlada — só precisa pré-popular com notas existentes do banco e marcar quais já estão persistidas (não reupload). Adicionar prop `notasExistentes` e tratar exclusão (delete em `solicitacao_notas` + remoção do storage).
+### Onde mais expor
+- **`/admin/baixas-pendentes`** (`BaixasPendentes.tsx`): também listar opcionalmente solicitações já `baixada` com filtro/aba "Recentemente baixadas" — fora do escopo desta entrega; manter botão apenas no modal de detalhes em Solicitações.
 
-### 4. Sem mudança de schema
-Não precisa nova coluna nem novo status: a presença de registros em `solicitacao_notas` com status ainda `entregue` já indica "baixa parcial em andamento".
+---
 
-## Arquivos afetados
+## Detalhes técnicos
 
-- `src/pages/user/Baixa.tsx` — dois botões, carregar notas existentes, lógica de rascunho.
-- `src/components/baixa/NotasFiscaisManager.tsx` — suportar notas pré-existentes (marcador `persisted`) e exclusão.
-- `src/pages/user/MinhasSolicitacoes.tsx` (ou onde lista solicitações `entregue`) — badge "Baixa parcial".
-- (Opcional) `src/pages/admin/Solicitacoes.tsx` e `src/pages/admin/BaixasPendentes.tsx` — mesmo badge para admin enxergar.
+- **Arquivos editados**: `src/pages/admin/Solicitacoes.tsx` (botão + handler + AlertDialog com Textarea para motivo).
+- **Migration**: única, idempotente para a reversão pontual da Stefhane (com `WHERE id = ...` e `WHERE status = 'baixada'` para segurança).
+- **Sem alterações de schema**: a operação usa apenas as colunas/tipos já existentes; `tipo = 'ajuste'` já é valor válido em `historico_fundos`.
+- **RLS**: admin já tem `UPDATE` em `solicitacoes` e `ALL` em `fundos`/`historico_fundos`, então não precisa novas policies.
+- **Notas fiscais**: registros em `solicitacao_notas` permanecem; como o status volta a `entregue`, as RLS permitem ao usuário continuar editando.
 
-Sem migrações de banco. Sem novos secrets.
+---
+
+## Resumo do que o usuário verá
+
+- A solicitação de R$ 200 da Stefhane reaparece para ela como "baixa pendente" com as notas já anexadas preservadas.
+- No admin, qualquer baixa concluída poderá ser desfeita com um clique + motivo, estornando troco automaticamente e notificando o solicitante.
