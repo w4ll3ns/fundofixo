@@ -8,9 +8,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { StatusBadge } from '@/components/ui/status-badge';
 import { supabase } from '@/integrations/supabase/client';
 import { formatCurrency, formatDate } from '@/lib/masks';
-import { ArrowUpDown, Search, FileText, Eye, Download, AlertTriangle } from 'lucide-react';
+import { ArrowUpDown, Search, FileText, Eye, Download, AlertTriangle, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ModalBaixaAdmin } from '@/components/admin/ModalBaixaAdmin';
+import { ModalExcluirBaixa } from '@/components/admin/ModalExcluirBaixa';
 import { useIsMobile } from '@/hooks/use-mobile';
 
 interface Solicitacao {
@@ -21,6 +22,9 @@ interface Solicitacao {
   data_aprovacao: string;
   created_at: string;
   empresa_id: string;
+  solicitante_user_id: string;
+  tipo_solicitacao: 'FUNDO_FIXO' | 'COMPRA_AVULSA';
+  upload_nota_fiscal_url: string | null;
   empresas: { nome_fantasia: string } | null;
   profiles: { nome: string } | null;
   justificativa: string;
