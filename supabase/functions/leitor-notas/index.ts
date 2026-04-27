@@ -147,6 +147,7 @@ async function callOpenAI(model: string, userContent: any, isPDF: boolean, base6
     },
     body: JSON.stringify({
       model,
+      response_format: { type: 'json_object' },
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userContent },
