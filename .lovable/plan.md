@@ -1,72 +1,52 @@
-# Seletor de Provedor IA com Chave OpenAI Segura
+## Problema
 
-Adicionar configuração administrativa para escolher entre **Lovable AI** (padrão) e **OpenAI própria**, com gestão segura da chave via secret backend.
+A nota enviada pela usuária Stefhane não foi lida pela IA. Os logs mostram apenas:
+- `AI provider: openai`
+- `AI raw response length: 392`
 
-## 1. Migration — tabela `ai_config`
+Não houve erro HTTP — a OpenAI respondeu (392 chars), mas a função **não loga o conteúdo bruto**, então não dá para saber se:
+1. A IA respondeu `{"notas_encontradas": 0, "notas": []}` (não conseguiu ler o PDF).
+2. A IA respondeu em formato inválido (markdown, texto livre) e o parse falhou silenciosamente.
+3. A Responses API da OpenAI retornou em campo diferente (`output_text` ausente).
 
-Singleton (1 linha) para armazenar preferência de provedor:
+392 chars é compatível com uma resposta vazia (`notas_encontradas: 0`) ou um JSON com 1 nota mínima. Sem o texto, é impossível decidir.
 
-- `id` uuid PK default gen_random_uuid()
-- `provider` text NOT NULL default `'lovable'` — valores: `'lovable'` ou `'openai'`
-- `openai_model` text default `'gpt-4o'`
-- `lovable_model` text default `'google/gemini-2.5-flash'`
-- `updated_at` timestamptz default now()
-- `updated_by` uuid
+## Diagnóstico encontrado no código (`leitor-notas/index.ts`)
 
-**RLS**: SELECT e UPDATE apenas para admins via `has_role(auth.uid(), 'admin')`. Edge functions usam service role para ler.
+1. **Falta log do conteúdo bruto** (linha 242 só loga `length`).
+2. **Parse silencioso**: quando falha, retorna `notas_encontradas: 0` com erro genérico, sem registrar o que veio.
+3. **Modelo padrão `gpt-4o-mini`** (configurado no banco) tem qualidade inferior para PDFs via Responses API; `gpt-4o` é mais confiável para extração estruturada de NFs.
+4. **Prompt OpenAI Responses** não força `response_format: json_object` nem usa o modo estruturado — depende só da instrução textual.
 
-A **chave OpenAI nunca é gravada nessa tabela** — fica no secret `OPENAI_API_KEY` da Lovable Cloud (criptografado).
+## Plano de correção
 
-## 2. Edge Functions
+### 1. Diagnóstico (logs) — `supabase/functions/leitor-notas/index.ts`
+- Logar os primeiros 500 chars do `content` retornado pela IA (mascarando se necessário).
+- No `catch (parseError)`, logar o conteúdo completo que falhou no parse.
+- Logar `data` cru da Responses API quando `text` ficar vazio, para confirmar o caminho de extração.
 
-### `leitor-notas` (refatorar existente)
-- Lê `ai_config.provider`
-- Se `'lovable'`: fluxo atual (LOVABLE_API_KEY + gateway)
-- Se `'openai'`:
-  - JPG/PNG → `https://api.openai.com/v1/chat/completions` com `gpt-4o` (image_url base64)
-  - PDF → `https://api.openai.com/v1/responses` com `input_file` (suporte nativo)
-  - Mantém tool calling para extração estruturada
-- Erros tratados: 401 (chave inválida), 429 (rate limit), 402/insufficient_quota (sem créditos)
-- Se provider=openai mas secret ausente → mensagem clara para configurar em /admin/configuracoes
+### 2. Robustez do parse
+- Aceitar JSON envolvido em texto: extrair primeiro bloco `{...}` via regex se `JSON.parse` direto falhar.
+- Adicionar fallback: se `notas_encontradas: 0` mas `total_value` ou campos top-level existirem, normalizar para o formato esperado.
 
-### `set-openai-key` (nova)
-- Valida JWT + role admin
-- Recebe `{ api_key }`, valida formato (`sk-...`, ≥40 chars)
-- Faz call de teste a `https://api.openai.com/v1/models` para confirmar
-- Se válida, persiste como secret via Supabase Management API
-- Retorna apenas `{ ok: true, masked: "sk-...XXXX" }` — nunca a chave em si
+### 3. Forçar JSON estruturado na OpenAI
+- No request à Responses API, adicionar `text: { format: { type: "json_object" } }` para garantir saída JSON válida.
+- Idem no Chat Completions (imagens): `response_format: { type: "json_object" }`.
 
-## 3. Frontend — Aba "Inteligência Artificial" em `/admin/configuracoes`
+### 4. Modelo recomendado para PDFs
+- Se `provider === 'openai'` e `isPDF`, usar `gpt-4o` mesmo que `openai_model` esteja como `gpt-4o-mini` (mini tem qualidade insuficiente para extração de NF em PDF). Logar quando o upgrade ocorrer.
+- Alternativamente, atualizar a UI da aba IA para recomendar `gpt-4o` como padrão.
 
-- **Radio**: Lovable AI (padrão) | OpenAI (minha chave)
-- Se OpenAI: select de modelo (gpt-4o, gpt-4o-mini, gpt-4-turbo)
-- Campo password "Chave API OpenAI":
-  - Botão olho (mostrar/ocultar)
-  - Validação zod: `sk-` + ≥40 chars
-  - Mostra mascarada se já configurada (`sk-•••••XXXX`)
-  - Botão "Testar e salvar" → chama `set-openai-key`
-  - Link "Onde obter minha chave?" → platform.openai.com/api-keys
-- Badge status: verde "Conectado" / vermelho "Não configurado"
-- Aviso: "Sua chave é armazenada criptografada no backend e nunca exposta ao navegador"
+### 5. Retorno mais informativo ao frontend
+- Quando o parse falhar, devolver `error` com uma amostra do conteúdo recebido (truncada) para o admin ver no toast/console e poder reportar.
 
-## Segurança aplicada
+## Próximo passo após aprovação
 
-- Chave nunca trafega de volta ao frontend após salva
-- Input password + autocomplete=off
-- Validação zod no client e na edge function
-- Edge functions checam `has_role(admin)` antes de qualquer operação
-- RLS em `ai_config` restrita a admins
-- Teste de validade antes de persistir
-- Secret gerenciado pela Lovable Cloud (criptografado)
+Após aplicar essas mudanças, peço para a Stefhane (ou você) reenviar a mesma nota. Com os novos logs vou identificar exatamente o motivo (modelo fraco, formato inesperado, PDF ilegível) e ajustar pontualmente.
 
-## Custo estimado OpenAI
+## Arquivos afetados
 
-`gpt-4o`: ~US$ 0,01–0,03 por nota fiscal lida.
+- `supabase/functions/leitor-notas/index.ts` — logs, parse robusto, `json_object`, upgrade automático de modelo para PDFs.
+- (Opcional) `src/pages/admin/configuracoes/InteligenciaArtificial.tsx` — destacar `gpt-4o` como recomendado para NFs em PDF.
 
-## Ordem de implementação
-
-1. Migration `ai_config` + RLS
-2. Solicitar secret `OPENAI_API_KEY` (você cola a chave)
-3. Refatorar `leitor-notas` com lógica dual-provider
-4. Criar `set-openai-key`
-5. Aba "Inteligência Artificial" em `/admin/configuracoes`
+Sem migrações de banco. Sem novos secrets.

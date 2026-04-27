@@ -94,6 +94,7 @@ async function callOpenAI(model: string, userContent: any, isPDF: boolean, base6
       },
       body: JSON.stringify({
         model,
+        text: { format: { type: 'json_object' } },
         input: [
           {
             role: 'system',
@@ -102,7 +103,7 @@ async function callOpenAI(model: string, userContent: any, isPDF: boolean, base6
           {
             role: 'user',
             content: [
-              { type: 'input_text', text: 'Analise esta nota fiscal em PDF e extraia os dados. Retorne apenas JSON, sem markdown.' },
+              { type: 'input_text', text: 'Analise esta nota fiscal em PDF e extraia os dados. Retorne apenas JSON válido, sem markdown.' },
               {
                 type: 'input_file',
                 filename: 'nota.pdf',
