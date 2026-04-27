@@ -427,6 +427,7 @@ export default function AdminSolicitacoes() {
                     <th className="text-left py-3 px-4 text-sm font-medium">Tipo</th>
                     <th className="text-left py-3 px-4 text-sm font-medium">Solicitante</th>
                     <th className="text-left py-3 px-4 text-sm font-medium">Empresa</th>
+                    <th className="text-left py-3 px-4 text-sm font-medium">Razão Social (Nota)</th>
                     <th className="text-left py-3 px-4 text-sm font-medium">Solicitado</th>
                     <th className="text-left py-3 px-4 text-sm font-medium">Entregue</th>
                     <th className="text-left py-3 px-4 text-sm font-medium">Data Nota</th>
