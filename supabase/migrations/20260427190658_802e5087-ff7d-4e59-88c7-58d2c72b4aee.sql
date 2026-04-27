@@ -1,0 +1,1 @@
+UPDATE public.fundos SET saldo_atual = 2431.49 WHERE id = 'ad43cc52-2853-40d8-bfef-b409b7900b6f';
