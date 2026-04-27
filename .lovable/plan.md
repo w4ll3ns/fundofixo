@@ -1,14 +1,29 @@
-## Confirmação antes de excluir nota fiscal anexada
+## Bug: cliente não lê a resposta multi-nota da IA
 
-### Mudança única
-**`src/components/baixa/NotasFiscaisManager.tsx`**:
+### Diagnóstico
+O edge function `leitor-notas` retorna corretamente:
+```json
+{ "notas_encontradas": 1, "notas": [{ "total_value": 110.60, "extracted_fields": {...} }] }
+```
 
-1. Importar `AlertDialog` e subcomponentes de `@/components/ui/alert-dialog`.
-2. Adicionar estado `notaToRemove: NotaFiscalItem | null`.
-3. No botão da lixeira (linha 274), trocar `onClick={() => handleRemove(n.id)}` por `onClick={() => setNotaToRemove(n)}`.
-4. Renderizar `AlertDialog` no fim do JSX:
-   - Título: **"Remover nota fiscal?"**
-   - Descrição mostra emitente/número/valor da nota selecionada e avisa que a ação não pode ser desfeita.
-   - Botão "Cancelar" e botão destrutivo "Remover" que chama `handleRemove(notaToRemove.id)` e limpa o estado.
+Mas `NotasFiscaisManager.tsx` (linha 179) checa `!aiData?.total_value` no nível raiz — que é `undefined` neste formato. Resultado: sempre cai no toast "IA não conseguiu ler a nota" mesmo quando a extração funcionou.
 
-Sem mudanças de schema, RLS ou outros componentes.
+### Correção
+**`src/components/baixa/NotasFiscaisManager.tsx`** — no handler de upload (linhas ~175–190):
+
+1. Após `invoke`, normalizar a resposta:
+   ```ts
+   const primeiraNota = aiData?.notas?.[0];
+   const ai = primeiraNota
+     ? { total_value: primeiraNota.total_value, confidence_label: primeiraNota.confidence_label, evidence_text: primeiraNota.evidence_text, extracted_fields: primeiraNota.extracted_fields }
+     : aiData?.total_value
+       ? aiData          // fallback retrocompat (formato antigo single-nota)
+       : null;
+   ```
+2. Trocar a condição de erro para `if (aiErr || !ai?.total_value)`.
+3. Usar `ai` (em vez de `aiData`) no preenchimento dos estados (`setValorDisplay`, `setDataEmissao`, etc.) e em `setAiResult(ai as AIResult)`.
+
+### (Opcional, futuro)
+Se um PDF tem **múltiplas notas**, hoje o cliente só usa a primeira. Posso adicionar suporte a multi-nota num próximo passo (gerar 1 item por nota detectada). Avisa se quiser que eu faça já junto.
+
+Sem mudanças no backend nem em outros arquivos.
