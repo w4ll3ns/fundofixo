@@ -260,7 +260,8 @@ export default function AdminSolicitacoes() {
 
   const filtered = solicitacoes.filter(s => {
     const matchesSearch = s.empresas?.nome_fantasia.toLowerCase().includes(search.toLowerCase()) ||
-      s.profiles?.nome.toLowerCase().includes(search.toLowerCase());
+      s.profiles?.nome.toLowerCase().includes(search.toLowerCase()) ||
+      (s.nome_emitente?.toLowerCase().includes(search.toLowerCase()) ?? false);
     
     // Filtro por mês de competência
     if (mesCompetencia !== 'all' && s.data_emissao_nota) {
@@ -330,6 +331,11 @@ export default function AdminSolicitacoes() {
                     <div className="min-w-0 flex-1">
                       <p className="font-medium truncate">{sol.profiles?.nome || '-'}</p>
                       <p className="text-sm text-muted-foreground truncate">{sol.empresas?.nome_fantasia || '-'}</p>
+                      {sol.nome_emitente && (
+                        <p className="text-xs text-muted-foreground truncate" title={sol.nome_emitente}>
+                          Emitente: {sol.nome_emitente}
+                        </p>
+                      )}
                     </div>
                     <StatusBadge status={sol.status} />
                   </div>
@@ -421,6 +427,7 @@ export default function AdminSolicitacoes() {
                     <th className="text-left py-3 px-4 text-sm font-medium">Tipo</th>
                     <th className="text-left py-3 px-4 text-sm font-medium">Solicitante</th>
                     <th className="text-left py-3 px-4 text-sm font-medium">Empresa</th>
+                    <th className="text-left py-3 px-4 text-sm font-medium">Razão Social (Nota)</th>
                     <th className="text-left py-3 px-4 text-sm font-medium">Solicitado</th>
                     <th className="text-left py-3 px-4 text-sm font-medium">Entregue</th>
                     <th className="text-left py-3 px-4 text-sm font-medium">Data Nota</th>
@@ -440,6 +447,9 @@ export default function AdminSolicitacoes() {
                       </td>
                       <td className="py-3 px-4 text-sm">{sol.profiles?.nome || '-'}</td>
                       <td className="py-3 px-4 text-sm">{sol.empresas?.nome_fantasia || '-'}</td>
+                      <td className="py-3 px-4 text-sm max-w-[200px] truncate" title={sol.nome_emitente || ''}>
+                        {sol.nome_emitente || '-'}
+                      </td>
                       <td className="py-3 px-4 text-sm font-medium">{formatCurrency(sol.valor_solicitado)}</td>
                       <td className="py-3 px-4 text-sm">{sol.valor_entregue ? formatCurrency(sol.valor_entregue) : '-'}</td>
                       <td className="py-3 px-4 text-sm">{sol.data_emissao_nota ? formatDate(sol.data_emissao_nota) : '-'}</td>
