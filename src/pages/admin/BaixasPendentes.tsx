@@ -381,24 +381,4 @@ export default function BaixasPendentes() {
     </AppLayout>
   );
 }
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
 
-      {/* Modal de Baixa */}
-      <ModalBaixaAdmin
-        open={modalOpen}
-        onOpenChange={setModalOpen}
-        solicitacao={selectedSolicitacao}
-        onSuccess={handleBaixaSuccess}
-      />
-    </AppLayout>
-  );
-}
