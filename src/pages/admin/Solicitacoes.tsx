@@ -542,8 +542,7 @@ export default function AdminSolicitacoes() {
                         Excede limite máximo de {formatCurrency(LIMITE_MAXIMO_SOLICITACAO)}
                       </p>
                     )}
-                    {selectedSolicitacao.tipo_solicitacao === 'FUNDO_FIXO' && 
-                     parseCurrency(valorEntregue) > getSaldoEmpresa(selectedSolicitacao.empresa_id) && (
+                    {parseCurrency(valorEntregue) > getSaldoEmpresa(selectedSolicitacao.empresa_id) && (
                       <p className="text-sm text-warning flex items-center gap-1">
                         <Wallet className="h-4 w-4" />
                         Excede saldo disponível do fundo
