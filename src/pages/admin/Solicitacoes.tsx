@@ -74,6 +74,9 @@ export default function AdminSolicitacoes() {
   const [motivoRejeicao, setMotivoRejeicao] = useState('');
   const [autorizarExcesso, setAutorizarExcesso] = useState(false);
   const [justificativaExcesso, setJustificativaExcesso] = useState('');
+  const [desfazerDialogOpen, setDesfazerDialogOpen] = useState(false);
+  const [motivoDesfazer, setMotivoDesfazer] = useState('');
+  const [desfazendo, setDesfazendo] = useState(false);
 
   const fetchData = async () => {
     let query = supabase
