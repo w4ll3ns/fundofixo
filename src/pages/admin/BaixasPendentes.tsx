@@ -56,13 +56,15 @@ export default function BaixasPendentes() {
   // Modal
   const [selectedSolicitacao, setSelectedSolicitacao] = useState<Solicitacao | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [selectedToDelete, setSelectedToDelete] = useState<Solicitacao | null>(null);
 
   const fetchData = async () => {
     setLoading(true);
     const [solRes, empRes] = await Promise.all([
       supabase
         .from('solicitacoes')
-        .select('id, valor_solicitado, valor_entregue, status, data_aprovacao, created_at, empresa_id, justificativa, empresas(nome_fantasia), profiles:solicitante_user_id(nome)')
+        .select('id, valor_solicitado, valor_entregue, status, data_aprovacao, created_at, empresa_id, solicitante_user_id, tipo_solicitacao, upload_nota_fiscal_url, justificativa, empresas(nome_fantasia), profiles:solicitante_user_id(nome)')
         .eq('status', 'entregue')
         .order('data_aprovacao', { ascending: false }),
       supabase.from('empresas').select('id, nome_fantasia').eq('status', true),
