@@ -137,7 +137,8 @@ export default function AdminSolicitacoes() {
     const fundoId = getFundoId(selectedSolicitacao.empresa_id);
     const isFundoFixo = selectedSolicitacao.tipo_solicitacao === 'FUNDO_FIXO';
     const excedeValor = valor > LIMITE_MAXIMO_SOLICITACAO;
-    const excedeSaldo = isFundoFixo && valor > saldoAtual;
+    // Tanto FUNDO_FIXO quanto COMPRA_AVULSA saem do mesmo caixa físico do fundo
+    const excedeSaldo = valor > saldoAtual;
 
     // Check if authorization is needed
     if ((excedeValor || excedeSaldo) && !autorizarExcesso) {
