@@ -209,12 +209,23 @@ export function ListaSolicitacoes({ defaultStatusFilter }: ListaSolicitacoesProp
                     <td className="py-3 px-4 text-sm font-medium">{formatCurrency(sol.valor_solicitado)}</td>
                     <td className="py-3 px-4 text-sm">{sol.valor_entregue ? formatCurrency(sol.valor_entregue) : '-'}</td>
                     <td className="py-3 px-4 text-sm">{sol.data_emissao_nota ? formatDate(sol.data_emissao_nota) : '-'}</td>
-                    <td className="py-3 px-4"><StatusBadge status={sol.status} /></td>
+                    <td className="py-3 px-4">
+                      <div className="flex flex-col gap-1 items-start">
+                        <StatusBadge status={sol.status} />
+                        {sol.status === 'entregue' && (sol.notas_count || 0) > 0 && (
+                          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-primary/10 text-primary">
+                            Baixa parcial · {sol.notas_count}
+                          </span>
+                        )}
+                      </div>
+                    </td>
                     <td className="py-3 px-4">
                       <div className="flex gap-2">
                         {(sol.status === 'entregue' || sol.status === 'pendente_ajuste') && (
                           <Button size="sm" asChild>
-                            <Link to={`/baixa/${sol.id}`}>Fazer Baixa</Link>
+                            <Link to={`/baixa/${sol.id}`}>
+                              {(sol.notas_count || 0) > 0 ? 'Continuar' : 'Fazer Baixa'}
+                            </Link>
                           </Button>
                         )}
                         <Button size="sm" variant="ghost" asChild>
