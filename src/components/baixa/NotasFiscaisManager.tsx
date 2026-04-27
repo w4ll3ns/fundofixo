@@ -413,7 +413,7 @@ export function NotasFiscaisManager({ notas, onChange, storagePathPrefix, inputI
             <AlertDialogTitle>Remover nota fiscal?</AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="space-y-2">
-                <p>Esta ação não pode ser desfeita. A nota será removida da lista{notaToRemove && originalDbIdsHint(notaToRemove) ? ' e excluída ao salvar' : ''}.</p>
+                <p>Esta ação não pode ser desfeita. A nota será removida da lista e excluída ao salvar.</p>
                 {notaToRemove && (
                   <div className="rounded-md border border-border bg-muted/30 p-3 text-sm text-foreground">
                     <p className="font-medium truncate">{notaToRemove.nome_emitente || notaToRemove.fileName || 'Nota fiscal'}</p>
