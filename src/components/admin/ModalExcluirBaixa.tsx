@@ -62,36 +62,51 @@ export function ModalExcluirBaixa({ open, onOpenChange, solicitacao, onSuccess }
     }
     setSubmitting(true);
     try {
-      // 1. Estorno de saldo (apenas FUNDO_FIXO com valor entregue)
+      // 1. Estorno de saldo (apenas FUNDO_FIXO com valor entregue) — idempotente
       if (vaiEstornar) {
-        const { data: fundo, error: fundoFetchErr } = await supabase
-          .from('fundos')
-          .select('id, saldo_atual')
-          .eq('empresa_id', solicitacao.empresa_id)
-          .maybeSingle();
-        if (fundoFetchErr) throw fundoFetchErr;
+        // Verifica se já existe estorno (evita duplicação em retentativas)
+        const { data: estornosExistentes } = await supabase
+          .from('historico_fundos')
+          .select('valor')
+          .eq('solicitacao_id', solicitacao.id)
+          .ilike('descricao', 'Estorno por exclusão de baixa pendente%');
 
-        if (fundo) {
-          const saldoAnterior = Number(fundo.saldo_atual);
-          const novoSaldo = saldoAnterior + valorEntregue;
+        const totalJaEstornado = (estornosExistentes || []).reduce(
+          (sum, h) => sum + Number(h.valor || 0),
+          0,
+        );
+        const faltaEstornar = Math.max(0, valorEntregue - totalJaEstornado);
 
-          const { error: fundoUpdErr } = await supabase
+        if (faltaEstornar > 0) {
+          const { data: fundo, error: fundoFetchErr } = await supabase
             .from('fundos')
-            .update({ saldo_atual: novoSaldo })
-            .eq('id', fundo.id);
-          if (fundoUpdErr) throw fundoUpdErr;
+            .select('id, saldo_atual')
+            .eq('empresa_id', solicitacao.empresa_id)
+            .maybeSingle();
+          if (fundoFetchErr) throw fundoFetchErr;
 
-          const { error: histErr } = await supabase.from('historico_fundos').insert({
-            fundo_id: fundo.id,
-            solicitacao_id: solicitacao.id,
-            tipo: 'ajuste',
-            valor: valorEntregue,
-            saldo_anterior: saldoAnterior,
-            saldo_posterior: novoSaldo,
-            descricao: `Estorno por exclusão de baixa pendente (${solicitacao.profiles?.nome || 'usuário'}). Motivo: ${motivo.trim()}`,
-            admin_id: user?.id,
-          });
-          if (histErr) throw histErr;
+          if (fundo) {
+            const saldoAnterior = Number(fundo.saldo_atual);
+            const novoSaldo = saldoAnterior + faltaEstornar;
+
+            const { error: fundoUpdErr } = await supabase
+              .from('fundos')
+              .update({ saldo_atual: novoSaldo })
+              .eq('id', fundo.id);
+            if (fundoUpdErr) throw fundoUpdErr;
+
+            const { error: histErr } = await supabase.from('historico_fundos').insert({
+              fundo_id: fundo.id,
+              solicitacao_id: solicitacao.id,
+              tipo: 'ajuste',
+              valor: faltaEstornar,
+              saldo_anterior: saldoAnterior,
+              saldo_posterior: novoSaldo,
+              descricao: `Estorno por exclusão de baixa pendente (${solicitacao.profiles?.nome || 'usuário'}). Motivo: ${motivo.trim()}`,
+              admin_id: user?.id,
+            });
+            if (histErr) throw histErr;
+          }
         }
       }
 
