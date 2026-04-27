@@ -1,60 +1,55 @@
-# Correção da baixa de COMPRA_AVULSA — saldo do fundo
+# Reconciliação do Fundo Fixo + Correção da Tela de Detalhes
 
-## Diagnóstico
+## Contexto
 
-Analisando a última baixa de hoje (id `e7107bef-...`, "TESTE DO VALOR", COMPRA_AVULSA):
+Auditoria completa identificou divergência de **R$ 447,48** entre o saldo real do banco (R$ 2.510,29) e o saldo correto pelas regras de negócio (R$ 2.062,81) no fundo "OXYGENI HUB - RENASCENCA".
 
-| Campo | Valor |
-|---|---|
-| valor_solicitado / valor_entregue | R$ 300,00 |
-| **valor_gasto_real (digitado na baixa)** | **R$ 110,60** |
-| troco_real | R$ 189,40 |
-| status | baixada |
+Causas:
+- 7 solicitações de Dez/2025 entregues mas sem débito (`saida`) registrado no histórico — total **R$ 581,88**
+- 3 solicitações com troco positivo nunca creditadas de volta (`devolucao_troco` estava bloqueado pelo CHECK constraint antigo) — total **R$ 157,02**
+- Tela de detalhes não exibe `valor_gasto_real` nem o troco/diferença, gerando confusão (ex.: usuário vê R$ 300 entregue mas não vê que foram gastos R$ 292,98 com R$ 7,02 de troco devolvido).
 
-Os dados foram gravados corretamente em `solicitacoes`. **O problema não está na gravação** — está no **impacto sobre o saldo do fundo**.
+---
 
-### Causa raiz
+## Parte A — Migração de Reconciliação
 
-Hoje a regra é:
-- **FUNDO_FIXO**: debita `valor_entregue` na aprovação. Ao baixar, devolve `troco_real` se positivo. Resultado líquido = `valor_gasto_real`. ✅
-- **COMPRA_AVULSA**: **não impacta o saldo do fundo** em nenhum momento (nem na aprovação, nem na baixa). ❌
+Migração SQL única que:
 
-Mas no fluxo real desta baixa, a Stefhane recebeu R$ 300 do caixa físico para uma compra avulsa, gastou R$ 110,60 e deveria devolver R$ 189,40 ao caixa — porém o sistema **não registrou nada disso no fundo**. Daí a percepção de que "baixou pelo valor solicitado": o saldo continua como se nada tivesse saído nem voltado, mas no caixa físico saíram R$ 110,60.
+1. **Insere 7 lançamentos `saida`** no `historico_fundos` para as solicitações entregues sem débito (Dez/2025), referenciando `solicitacao_id` e com descrição "Reconciliação retroativa — entrega não registrada".
+2. **Insere 3 lançamentos `devolucao_troco`** para os trocos não creditados, referenciando `solicitacao_id` e com descrição "Reconciliação retroativa — troco não devolvido".
+3. **Recalcula `saldo_anterior`/`saldo_posterior`** dos lançamentos inseridos respeitando a ordem cronológica.
+4. **Atualiza `fundos.saldo_atual`** do OXYGENI HUB - RENASCENCA para **R$ 2.062,81**.
+5. **Lança um registro `ajuste`** final de auditoria explicando a reconciliação (admin_id = admin atual, descrição "Ajuste de reconciliação geral — auditoria 27/04/2026").
 
-Adicionalmente, a regra atual de devolução de troco (`Baixa.tsx` linha 189 e `ModalBaixaAdmin.tsx` linha 189) roda mesmo para COMPRA_AVULSA, **creditando** troco num saldo que nunca foi debitado — o que inflaria o fundo se o usuário tivesse usado dinheiro do fundo. Felizmente, neste caso não disparou porque a COMPRA_AVULSA foi tratada à parte do fundo, mas o código está logicamente inconsistente.
+Antes de executar, confirmo via SELECT a lista exata das 10 solicitações afetadas e o delta resultante (deve fechar em -R$ 447,48).
 
-## Decisão de regra (a confirmar pelo usuário no plano)
+## Parte B — Correção da Tela de Detalhes
 
-Tratar COMPRA_AVULSA com a **mesma mecânica do FUNDO_FIXO** quando o dinheiro sai do caixa físico:
-1. Na **aprovação** (`ModalAprovacao` / endpoint de aprovação): debitar `valor_entregue` do `fundos.saldo_atual` e registrar `historico_fundos` com `tipo='saida'`, `descricao='Adiantamento compra avulsa - <solicitante>'`.
-2. Na **baixa** com `troco_real > 0`: creditar o troco e registrar `tipo='devolucao_troco'` (já existe).
-3. Na **baixa** com `valor_gasto_real > valor_entregue` (`pendente_ajuste`): nenhum efeito até o admin resolver o ajuste (igual ao FUNDO_FIXO).
+Atualizar o componente de detalhes da solicitação (admin e usuário) para exibir:
 
-Resultado para a baixa de hoje, retroativamente: deveria existir `-R$ 300` (saída) e `+R$ 189,40` (troco) no histórico → impacto líquido `-R$ 110,60`.
+- **Valor solicitado** (já existe)
+- **Valor entregue** (já existe)
+- **Valor gasto real** (`valor_gasto_real`) — NOVO
+- **Troco devolvido** (`troco_real`) quando > 0 — NOVO
+- **Diferença** quando `valor_gasto_real > valor_entregue` (excesso) — NOVO, em destaque vermelho
+- Badge visual "Troco devolvido ao fundo" quando aplicável
 
-## Mudanças propostas
+Arquivos a editar (a confirmar na implementação):
+- `src/pages/admin/Solicitacoes.tsx` (modal/drawer de detalhes)
+- `src/components/SolicitacaoDetails.tsx` ou equivalente do lado do usuário
 
-### 1. Aprovação (debitar fundo também para COMPRA_AVULSA)
+---
 
-Localizar onde a aprovação atualiza `solicitacoes.status = 'entregue'` (a request PATCH do log) e replicar para COMPRA_AVULSA o mesmo bloco de débito do fundo já usado em FUNDO_FIXO. Buscar com `rg "tipo_solicitacao.*FUNDO_FIXO" src` para identificar o ponto exato (provavelmente `src/pages/admin/Solicitacoes.tsx` ou um modal de aprovação).
+## Detalhes Técnicos
 
-### 2. Baixa (`src/pages/user/Baixa.tsx` e `src/components/admin/ModalBaixaAdmin.tsx`)
+- Migração via ferramenta de migração (schema já permite `devolucao_troco` após correção anterior).
+- Os 10 inserts em `historico_fundos` serão feitos numa transação única.
+- O ajuste final em `fundos.saldo_atual` e o lançamento `ajuste` garantem rastreabilidade total.
+- A tela usará os campos já existentes na tabela `solicitacoes` — sem mudança de schema.
+- Após aplicar, validarei: saldo do fundo = R$ 2.062,81 e soma de `historico_fundos` bate com saldo.
 
-A devolução de troco (linhas 188-216 em ambos) já é genérica — passa a ser correta para os dois tipos uma vez que a aprovação debite o fundo.
+## Resultado Esperado
 
-### 3. Migração de correção (data fix)
-
-Para a solicitação `e7107bef-584f-4e7e-baa6-dada40128d21` (já baixada e que afetou caixa físico):
-- Inserir em `historico_fundos`:
-  - `tipo='saida'`, `valor=-300`, `saldo_anterior=2431.49`, `saldo_posterior=2131.49`, `descricao='Ajuste retroativo: adiantamento compra avulsa TESTE DO VALOR'`
-  - `tipo='devolucao_troco'`, `valor=189.40`, `saldo_anterior=2131.49`, `saldo_posterior=2320.89`, `descricao='Ajuste retroativo: troco compra avulsa TESTE DO VALOR'`
-- Atualizar `fundos.saldo_atual` para **R$ 2.320,89**.
-
-> **Atenção**: isto contradiz a memória `request-types-and-balance-impact` que diz "COMPRA_AVULSA does not reduce balance". Essa memória será atualizada caso você confirme a nova regra.
-
-## Pergunta antes de executar
-
-A COMPRA_AVULSA, na prática operacional de vocês, **sai do mesmo caixa físico do fundo fixo** (precisa debitar e devolver troco) ou é um pagamento por outro meio (cartão corporativo / reembolso) que **não toca o caixa**?
-
-- **Opção A (recomendada se sai do caixa)**: aplicar plano completo acima — debita na aprovação, devolve troco na baixa, e ajusta retroativamente o saldo para R$ 2.320,89.
-- **Opção B (se não toca o caixa)**: nenhuma alteração de regra — apenas ajustar a UI da baixa para não confundir (ex: ocultar bloco de troco quando COMPRA_AVULSA, ou explicitar "não impacta fundo"). Saldo permanece R$ 2.431,49.
+- Saldo do fundo OXYGENI HUB - RENASCENCA: **R$ 2.062,81** (consistente com regras)
+- Histórico completo e auditável (toda saída/troco refletido)
+- Tela de detalhes mostra valor real gasto e troco, eliminando dúvidas como a do "TESTE DO VALOR" (R$ 292,98 em vez de R$ 300).
