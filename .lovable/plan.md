@@ -1,36 +1,69 @@
-## Verificação prévia (PARTE 1)
+## Etapa 4 — Criar 3 RPCs financeiras transacionais (somente DB)
 
-Executei a query de duplicatas de CNPJ em `public.empresas`:
+Criar **uma única migration** `rpc_financeiras_aprovar_baixar_rejeitar` contendo as três funções PL/pgSQL exatamente como você especificou, mais os GRANTs. Nenhum arquivo do front será tocado.
 
+## O que será criado
+
+### 1. `public.aprovar_solicitacao(uuid, numeric, text, text, boolean, text) → uuid`
+- `SECURITY DEFINER`, `search_path = public`
+- Valida `has_role(admin)` e valor > 0
+- `SELECT ... FOR UPDATE` na solicitação (status deve ser `enviada`) e no fundo da empresa → elimina race condition entre admins
+- Calcula `excedeu_saldo` / `excedeu_limite` (>300); exige `_autorizar_excesso=true` + `_justificativa_excesso` quando aplicável
+- Atomicamente: UPDATE `solicitacoes` (status `entregue`, dados de aprovação, flags de excesso) + UPDATE `fundos.saldo_atual` + INSERT `historico_fundos` (`tipo='saida'`, descrição diferenciada por `tipo_solicitacao`) + INSERT `notificacoes` (sucesso) para o solicitante
+
+### 2. `public.finalizar_baixa(uuid, numeric, text, date, text, text, text, text) → uuid`
+- `SECURITY DEFINER`, `search_path = public`
+- Permissão: dono da solicitação OU admin
+- Status atual deve ser `entregue` ou `pendente_ajuste`
+- `FOR UPDATE` na solicitação; calcula `troco_real = valor_entregue - valor_gasto_real`
+- Novo status: `pendente_ajuste` se troco < 0, senão `baixada`
+- UPDATE da solicitação com dados da nota (CNPJ normalizado via `regexp_replace`)
+- Se `troco_real > 0` E status = `baixada`: `FOR UPDATE` no fundo, UPDATE `saldo_atual += troco`, INSERT `historico_fundos` (`tipo='devolucao_troco'`)
+- Em `pendente_ajuste` NÃO mexe no fundo
+
+### 3. `public.rejeitar_solicitacao(uuid, text) → uuid`
+- `SECURITY DEFINER`, `search_path = public`
+- Valida admin + motivo não vazio + status `enviada`
+- UPDATE solicitação para `rejeitada` + INSERT `notificacoes` (`error`) para o solicitante
+- Não mexe no fundo (nada foi entregue)
+
+### GRANTs
 ```
-SELECT cnpj, COUNT(*) FROM public.empresas GROUP BY cnpj HAVING COUNT(*) > 1;
-→ 0 linhas
+GRANT EXECUTE ON FUNCTION public.aprovar_solicitacao(uuid, numeric, text, text, boolean, text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.finalizar_baixa(uuid, numeric, text, date, text, text, text, text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.rejeitar_solicitacao(uuid, text) TO authenticated;
 ```
 
-**Sem duplicatas.** Posso aplicar a migration completa com segurança, incluindo o `UNIQUE` em `empresas.cnpj`.
+## Garantias técnicas
 
-Verificação adicional: `fundos.empresa_id` já tem constraint `UNIQUE` (`fundos_empresa_id_key`), então o `ON CONFLICT (empresa_id) DO NOTHING` no trigger e no back-fill funciona corretamente.
+- **Atomicidade**: tudo dentro de uma única transação implícita do RPC; qualquer `RAISE EXCEPTION` faz rollback completo (resolve estados inconsistentes atuais).
+- **Concorrência**: `SELECT ... FOR UPDATE` em `solicitacoes` e `fundos` serializa admins concorrentes (resolve sobrescrita de saldo).
+- **Compatível com schema atual**:
+  - `historico_fundos.tipo` aceita `'saida'` e `'devolucao_troco'` (memória `historico-fundos-transaction-types`).
+  - Nova policy de `notificacoes` permite INSERT por admin (RPC roda como `SECURITY DEFINER`, mas a policy de admin/self também cobre).
+  - Trigger `trg_empresa_criar_fundo` garante que `fundos` existe; ainda assim mantemos o check defensivo.
+  - CHECK `valor_solicitado > 0` não é tocado; valores entregue/gasto validados por `RAISE EXCEPTION`.
 
-> Nota: existe uma memória do projeto que diz "CNPJ is NOT unique/PK. Multiple branches can share CNPJ". Adicionar `UNIQUE(cnpj)` agora **muda essa regra de negócio** — passará a ser proibido cadastrar duas filiais com o mesmo CNPJ. Como você pediu explicitamente o constraint e o banco hoje não tem duplicatas, vou aplicar e atualizar a memória após a execução. Se quiser manter a regra antiga, me avise antes de aprovar.
+## Pós-migration (verificação)
 
-## Migration (PARTE 2)
+Rodar via `supabase--read_query`:
+```sql
+SELECT proname, pg_get_function_identity_arguments(oid) AS args
+FROM pg_proc
+WHERE pronamespace = 'public'::regnamespace
+  AND proname IN ('aprovar_solicitacao','finalizar_baixa','rejeitar_solicitacao');
 
-Criar **uma única** migration `hardening_rls_constraints_e_trigger_fundo` com os 6 blocos exatamente como você especificou:
-
-1. **RLS `notificacoes`** — drop `"System can insert notifications"`, criar `"Only admin or self can insert notifications"` com `WITH CHECK (user_id = auth.uid() OR has_role(auth.uid(), 'admin'))`.
-2. **RLS UPDATE `solicitacoes`** — drop e recriar `"Users can update own solicitacoes when allowed"` adicionando `WITH CHECK (solicitante_user_id = auth.uid())`.
-3. **`ALTER TABLE empresas ADD CONSTRAINT empresas_cnpj_unique UNIQUE (cnpj)`**.
-4. **`ALTER TABLE solicitacoes ADD CONSTRAINT chk_valor_solicitado_positivo CHECK (valor_solicitado > 0)`**.
-5. **Trigger `trg_empresa_criar_fundo`** + função `criar_fundo_empresa()` (`SECURITY DEFINER`, `search_path = public`) que insere em `fundos` no `AFTER INSERT` em `empresas`, com `ON CONFLICT (empresa_id) DO NOTHING`.
-6. **Back-fill** — `INSERT INTO fundos` para toda empresa sem fundo correspondente.
+SELECT routine_name, grantee, privilege_type
+FROM information_schema.routine_privileges
+WHERE routine_schema = 'public'
+  AND routine_name IN ('aprovar_solicitacao','finalizar_baixa','rejeitar_solicitacao')
+  AND grantee = 'authenticated';
+```
+Esperado: 3 linhas em `pg_proc`, 3 grants `EXECUTE` para `authenticated`.
 
 ## Fora de escopo (não vou fazer)
 
-- Nenhuma alteração em código TypeScript/React.
-- Nenhuma outra policy mexida.
-- Nenhuma RPC criada (fica pra Etapa 4).
-
-## Pós-migration
-
-- Atualizar a memória `mem://data-model/company-cnpj-constraint` para refletir que CNPJ agora é UNIQUE.
-- Confirmar via `supabase--read_query` que: a policy antiga sumiu, a nova existe, o constraint UNIQUE existe, o CHECK existe, o trigger existe, e que `count(empresas) == count(fundos)` após o back-fill.
+- Nenhuma alteração em `src/` (TS/React/CSS).
+- Nenhuma chamada dessas RPCs do front — você vai validar manualmente no SQL Editor antes da migração do front.
+- Nada de `importar_notas_lote` — fica para outra etapa.
+- Nenhuma policy/função existente removida ou modificada.
