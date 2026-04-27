@@ -129,6 +129,12 @@ export default function AdminSolicitacoes() {
     setDetailDialogOpen(true);
   };
 
+  const openDesfazer = (sol: Solicitacao) => {
+    setSelectedSolicitacao(sol);
+    setMotivoDesfazer('');
+    setDesfazerDialogOpen(true);
+  };
+
   const handleApprove = async () => {
     if (!selectedSolicitacao) return;
     const valor = parseCurrency(valorEntregue);
