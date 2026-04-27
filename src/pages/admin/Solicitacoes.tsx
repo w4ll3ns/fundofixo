@@ -518,15 +518,13 @@ export default function AdminSolicitacoes() {
             {selectedSolicitacao && (
               <DialogBody>
                 <div className="space-y-4">
-                  {/* Info sobre saldo (apenas FUNDO_FIXO) */}
-                  {selectedSolicitacao.tipo_solicitacao === 'FUNDO_FIXO' && (
-                    <Alert>
-                      <Wallet className="h-4 w-4" />
-                      <AlertDescription>
-                        Saldo disponível da empresa: <strong>{formatCurrency(getSaldoEmpresa(selectedSolicitacao.empresa_id))}</strong>
-                      </AlertDescription>
-                    </Alert>
-                  )}
+                  {/* Info sobre saldo do fundo */}
+                  <Alert>
+                    <Wallet className="h-4 w-4" />
+                    <AlertDescription>
+                      Saldo disponível da empresa: <strong>{formatCurrency(getSaldoEmpresa(selectedSolicitacao.empresa_id))}</strong>
+                    </AlertDescription>
+                  </Alert>
 
                   <div className="space-y-2">
                     <Label>Valor Entregue *</Label>
