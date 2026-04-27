@@ -245,13 +245,17 @@ export function ModalResolverAjuste({ open, onOpenChange, solicitacao, onSuccess
               />
             </div>
 
-            {/* Nota fiscal */}
-            {solicitacao.upload_nota_fiscal_url && (
-              <div className="space-y-2 pt-2 border-t">
-                <Label>Nota Fiscal</Label>
-                <NotaFiscalPreview filePath={solicitacao.upload_nota_fiscal_url} />
-              </div>
-            )}
+            {/* Notas fiscais */}
+            <div className="space-y-2 pt-2 border-t">
+              <Label>Notas Fiscais</Label>
+              <NotasFiscaisList
+                solicitacaoId={solicitacao.id}
+                legacy={{
+                  upload_nota_fiscal_url: solicitacao.upload_nota_fiscal_url,
+                  valor_gasto_real: solicitacao.valor_gasto_real,
+                }}
+              />
+            </div>
           </div>
         </DialogBody>
 
