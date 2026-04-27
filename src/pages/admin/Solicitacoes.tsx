@@ -247,7 +247,81 @@ export default function AdminSolicitacoes() {
 
     toast({ title: 'Solicitação rejeitada' });
     setRejectDialogOpen(false);
-    fetchData();
+  };
+
+  const handleDesfazerBaixa = async () => {
+    if (!selectedSolicitacao) return;
+    if (!motivoDesfazer.trim()) {
+      toast({ title: 'Motivo obrigatório', description: 'Informe o motivo do desfazimento.', variant: 'destructive' });
+      return;
+    }
+    if (selectedSolicitacao.status !== 'baixada' && selectedSolicitacao.status !== 'pendente_ajuste') {
+      toast({ title: 'Operação não permitida', description: 'Só é possível desfazer baixas concluídas.', variant: 'destructive' });
+      return;
+    }
+
+    setDesfazendo(true);
+    try {
+      const troco = selectedSolicitacao.troco_real || 0;
+      const fundoId = getFundoId(selectedSolicitacao.empresa_id);
+
+      // 1. Estornar troco do fundo (se houver)
+      if (troco > 0 && fundoId) {
+        const { data: fundoData, error: fundoFetchError } = await supabase
+          .from('fundos').select('saldo_atual').eq('id', fundoId).single();
+        if (fundoFetchError) throw fundoFetchError;
+
+        const saldoAnterior = Number(fundoData.saldo_atual);
+        const saldoPosterior = saldoAnterior - troco;
+
+        const { error: updFundoError } = await supabase
+          .from('fundos').update({ saldo_atual: saldoPosterior }).eq('id', fundoId);
+        if (updFundoError) throw updFundoError;
+
+        await supabase.from('historico_fundos').insert({
+          fundo_id: fundoId,
+          tipo: 'ajuste',
+          valor: -troco,
+          descricao: `Desfazimento de baixa (estorno do troco): ${motivoDesfazer.substring(0, 200)}`,
+          admin_id: user?.id,
+          solicitacao_id: selectedSolicitacao.id,
+          saldo_anterior: saldoAnterior,
+          saldo_posterior: saldoPosterior,
+        });
+      }
+
+      // 2. Reverter solicitação para 'entregue'
+      const obsAppend = `[Baixa desfeita em ${new Date().toLocaleString('pt-BR')}: ${motivoDesfazer}]`;
+      const { error: updSolError } = await supabase.from('solicitacoes').update({
+        status: 'entregue',
+        data_baixa: null,
+        valor_gasto_real: null,
+        troco_real: null,
+        observacoes_admin: selectedSolicitacao.status
+          ? obsAppend
+          : obsAppend,
+      }).eq('id', selectedSolicitacao.id);
+      if (updSolError) throw updSolError;
+
+      // 3. Notificar usuário
+      await supabase.from('notificacoes').insert({
+        user_id: selectedSolicitacao.solicitante_user_id,
+        titulo: 'Baixa revertida para correção',
+        mensagem: `Sua baixa foi revertida pelo administrador. Motivo: ${motivoDesfazer}. Acesse "Continuar Baixa" para corrigir.`,
+        tipo: 'warning',
+        link: `/baixa/${selectedSolicitacao.id}`,
+      });
+
+      toast({ title: 'Baixa desfeita', description: troco > 0 ? `Troco de ${formatCurrency(troco)} estornado do fundo.` : 'A solicitação voltou para "Baixa pendente".' });
+      setDesfazerDialogOpen(false);
+      setDetailDialogOpen(false);
+      setMotivoDesfazer('');
+      fetchData();
+    } catch (error: any) {
+      toast({ title: 'Erro ao desfazer baixa', description: error.message, variant: 'destructive' });
+    } finally {
+      setDesfazendo(false);
+    }
   };
 
   // Gerar lista de meses disponíveis baseado nas notas baixadas
