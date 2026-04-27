@@ -229,8 +229,11 @@ serve(async (req) => {
     let content: string;
     try {
       if (provider === 'openai') {
-        // For PDFs, use the Pro model fallback if configured to mini (Responses requires gpt-4o or above)
-        const model = openaiModel || 'gpt-4o';
+        let model = openaiModel || 'gpt-4o';
+        if (isPDF && /mini|nano/i.test(model)) {
+          console.log(`Upgrading model from ${model} to gpt-4o for PDF processing`);
+          model = 'gpt-4o';
+        }
         content = await callOpenAI(model, userContent, isPDF, base64Data);
       } else {
         const model = isPDF ? 'google/gemini-2.5-pro' : lovableModel;
@@ -245,6 +248,7 @@ serve(async (req) => {
     }
 
     console.log('AI raw response length:', content?.length);
+    console.log('AI raw response preview:', (content || '').slice(0, 500));
 
     // Parse JSON
     let result: any;
@@ -255,7 +259,15 @@ serve(async (req) => {
       if (jsonStr.endsWith('```')) jsonStr = jsonStr.slice(0, -3);
       jsonStr = jsonStr.trim();
 
-      const parsed = JSON.parse(jsonStr);
+      let parsed: any;
+      try {
+        parsed = JSON.parse(jsonStr);
+      } catch {
+        const match = jsonStr.match(/\{[\s\S]*\}/);
+        if (!match) throw new Error('Nenhum JSON encontrado na resposta');
+        parsed = JSON.parse(match[0]);
+      }
+
       if (parsed.notas_encontradas !== undefined && Array.isArray(parsed.notas)) {
         result = parsed;
       } else if (parsed.total_value !== undefined) {
@@ -273,8 +285,15 @@ serve(async (req) => {
         throw new Error('Formato de resposta não reconhecido');
       }
     } catch (parseError) {
+      const sample = (content || '').slice(0, 800);
       console.error('Failed to parse AI response:', parseError);
-      result = { notas_encontradas: 0, notas: [], error: 'Falha ao interpretar resposta da IA' };
+      console.error('Raw content that failed to parse:', sample);
+      result = {
+        notas_encontradas: 0,
+        notas: [],
+        error: 'Falha ao interpretar resposta da IA',
+        debug_sample: sample,
+      };
     }
 
     return new Response(
