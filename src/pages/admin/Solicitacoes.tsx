@@ -571,8 +571,7 @@ export default function AdminSolicitacoes() {
 
                   {/* Autorização de excesso */}
                   {(parseCurrency(valorEntregue) > LIMITE_MAXIMO_SOLICITACAO || 
-                    (selectedSolicitacao.tipo_solicitacao === 'FUNDO_FIXO' && 
-                     parseCurrency(valorEntregue) > getSaldoEmpresa(selectedSolicitacao.empresa_id))) && (
+                    parseCurrency(valorEntregue) > getSaldoEmpresa(selectedSolicitacao.empresa_id)) && (
                     <div className="space-y-4 p-4 rounded-lg border border-warning bg-warning/5">
                       <div className="flex items-center space-x-2">
                         <Checkbox 
