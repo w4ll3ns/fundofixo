@@ -14,7 +14,9 @@ import { ModalExcluirBaixa } from '@/components/admin/ModalExcluirBaixa';
 
 interface Solicitacao {
   id: string;
+  empresa_id: string;
   solicitante_user_id: string;
+  tipo_solicitacao: 'FUNDO_FIXO' | 'COMPRA_AVULSA';
   valor_solicitado: number;
   valor_entregue: number | null;
   valor_gasto_real: number | null;
