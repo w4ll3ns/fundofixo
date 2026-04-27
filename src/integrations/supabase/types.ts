@@ -14,6 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      _test_results_rpcs: {
+        Row: {
+          codigo: string | null
+          descricao: string | null
+          detalhes: string | null
+          esperado: string | null
+          observado: string | null
+          passou: boolean | null
+          seq: number | null
+        }
+        Insert: {
+          codigo?: string | null
+          descricao?: string | null
+          detalhes?: string | null
+          esperado?: string | null
+          observado?: string | null
+          passou?: boolean | null
+          seq?: number | null
+        }
+        Update: {
+          codigo?: string | null
+          descricao?: string | null
+          detalhes?: string | null
+          esperado?: string | null
+          observado?: string | null
+          passou?: boolean | null
+          seq?: number | null
+        }
+        Relationships: []
+      }
       ai_config: {
         Row: {
           id: string
