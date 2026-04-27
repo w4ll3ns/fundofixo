@@ -252,6 +252,7 @@ export type Database = {
       }
       solicitacoes: {
         Row: {
+          admin_ajuste_id: string | null
           admin_aprovador_id: string | null
           ai_confianca: Database["public"]["Enums"]["nivel_confianca"] | null
           ai_evidencia: string | null
@@ -262,6 +263,7 @@ export type Database = {
           categoria: string | null
           cnpj_emitente: string | null
           created_at: string
+          data_ajuste: string | null
           data_aprovacao: string | null
           data_baixa: string | null
           data_emissao_nota: string | null
@@ -276,18 +278,22 @@ export type Database = {
           motivo_rejeicao: string | null
           nome_emitente: string | null
           numero_nota: string | null
+          observacao_ajuste: string | null
           observacoes_admin: string | null
           solicitante_user_id: string
           status: Database["public"]["Enums"]["status_solicitacao"]
+          tipo_ajuste: string | null
           tipo_solicitacao: Database["public"]["Enums"]["tipo_solicitacao"]
           troco_real: number | null
           updated_at: string
           upload_nota_fiscal_url: string | null
+          valor_ajuste: number | null
           valor_entregue: number | null
           valor_gasto_real: number | null
           valor_solicitado: number
         }
         Insert: {
+          admin_ajuste_id?: string | null
           admin_aprovador_id?: string | null
           ai_confianca?: Database["public"]["Enums"]["nivel_confianca"] | null
           ai_evidencia?: string | null
@@ -298,6 +304,7 @@ export type Database = {
           categoria?: string | null
           cnpj_emitente?: string | null
           created_at?: string
+          data_ajuste?: string | null
           data_aprovacao?: string | null
           data_baixa?: string | null
           data_emissao_nota?: string | null
@@ -312,18 +319,22 @@ export type Database = {
           motivo_rejeicao?: string | null
           nome_emitente?: string | null
           numero_nota?: string | null
+          observacao_ajuste?: string | null
           observacoes_admin?: string | null
           solicitante_user_id: string
           status?: Database["public"]["Enums"]["status_solicitacao"]
+          tipo_ajuste?: string | null
           tipo_solicitacao?: Database["public"]["Enums"]["tipo_solicitacao"]
           troco_real?: number | null
           updated_at?: string
           upload_nota_fiscal_url?: string | null
+          valor_ajuste?: number | null
           valor_entregue?: number | null
           valor_gasto_real?: number | null
           valor_solicitado: number
         }
         Update: {
+          admin_ajuste_id?: string | null
           admin_aprovador_id?: string | null
           ai_confianca?: Database["public"]["Enums"]["nivel_confianca"] | null
           ai_evidencia?: string | null
@@ -334,6 +345,7 @@ export type Database = {
           categoria?: string | null
           cnpj_emitente?: string | null
           created_at?: string
+          data_ajuste?: string | null
           data_aprovacao?: string | null
           data_baixa?: string | null
           data_emissao_nota?: string | null
@@ -348,13 +360,16 @@ export type Database = {
           motivo_rejeicao?: string | null
           nome_emitente?: string | null
           numero_nota?: string | null
+          observacao_ajuste?: string | null
           observacoes_admin?: string | null
           solicitante_user_id?: string
           status?: Database["public"]["Enums"]["status_solicitacao"]
+          tipo_ajuste?: string | null
           tipo_solicitacao?: Database["public"]["Enums"]["tipo_solicitacao"]
           troco_real?: number | null
           updated_at?: string
           upload_nota_fiscal_url?: string | null
+          valor_ajuste?: number | null
           valor_entregue?: number | null
           valor_gasto_real?: number | null
           valor_solicitado?: number
