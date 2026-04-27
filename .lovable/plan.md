@@ -1,52 +1,45 @@
 ## Problema
 
-A nota enviada pela usuária Stefhane não foi lida pela IA. Os logs mostram apenas:
-- `AI provider: openai`
-- `AI raw response length: 392`
+A solicitação de R$ 200,00 (id `a53bf676...`) foi finalizada como `baixada` mesmo tendo apenas 1 nota de R$ 110,60 anexada. Hoje a tela "Realizar Baixa" só tem **um botão "Confirmar Baixa"** que finaliza imediatamente — não há como o usuário **salvar o progresso** (anexar 1 nota agora, voltar mais tarde para anexar as demais).
 
-Não houve erro HTTP — a OpenAI respondeu (392 chars), mas a função **não loga o conteúdo bruto**, então não dá para saber se:
-1. A IA respondeu `{"notas_encontradas": 0, "notas": []}` (não conseguiu ler o PDF).
-2. A IA respondeu em formato inválido (markdown, texto livre) e o parse falhou silenciosamente.
-3. A Responses API da OpenAI retornou em campo diferente (`output_text` ausente).
+Resultado: o usuário sente-se forçado a finalizar e o sistema marca como `baixada` sem checar se realmente o gasto bate com o entregue.
 
-392 chars é compatível com uma resposta vazia (`notas_encontradas: 0`) ou um JSON com 1 nota mínima. Sem o texto, é impossível decidir.
+## Comportamento desejado
 
-## Diagnóstico encontrado no código (`leitor-notas/index.ts`)
+Na tela de baixa do usuário (`/baixa/:id`), oferecer **dois caminhos**:
 
-1. **Falta log do conteúdo bruto** (linha 242 só loga `length`).
-2. **Parse silencioso**: quando falha, retorna `notas_encontradas: 0` com erro genérico, sem registrar o que veio.
-3. **Modelo padrão `gpt-4o-mini`** (configurado no banco) tem qualidade inferior para PDFs via Responses API; `gpt-4o` é mais confiável para extração estruturada de NFs.
-4. **Prompt OpenAI Responses** não força `response_format: json_object` nem usa o modo estruturado — depende só da instrução textual.
+1. **Salvar Rascunho** — anexa as notas adicionadas, mantém a solicitação como **pendente de baixa** (status fica `entregue` com indicação visual de "baixa parcial em andamento"). Usuário pode voltar e adicionar mais notas depois.
+2. **Finalizar Baixa** — só fica habilitado quando o total das notas ≥ valor entregue (ou usuário confirma que houve troco real a devolver). Mantém o fluxo atual (`baixada` ou `pendente_ajuste`).
 
-## Plano de correção
+Enquanto não finalizar, o sistema trata a solicitação como **pendente de baixa** com status visual "Baixa parcial" quando já houver notas salvas mas total < valor entregue.
 
-### 1. Diagnóstico (logs) — `supabase/functions/leitor-notas/index.ts`
-- Logar os primeiros 500 chars do `content` retornado pela IA (mascarando se necessário).
-- No `catch (parseError)`, logar o conteúdo completo que falhou no parse.
-- Logar `data` cru da Responses API quando `text` ficar vazio, para confirmar o caminho de extração.
+## Plano de implementação
 
-### 2. Robustez do parse
-- Aceitar JSON envolvido em texto: extrair primeiro bloco `{...}` via regex se `JSON.parse` direto falhar.
-- Adicionar fallback: se `notas_encontradas: 0` mas `total_value` ou campos top-level existirem, normalizar para o formato esperado.
+### 1. Tela `src/pages/user/Baixa.tsx`
+- Buscar notas já existentes em `solicitacao_notas` ao carregar (para retomar rascunho).
+- Calcular `valorJaSalvo` (notas no banco) + `valorGastoNovo` (notas adicionadas na sessão).
+- Substituir o botão único por dois:
+  - **"Salvar Rascunho"** → insere apenas as notas novas em `solicitacao_notas`, NÃO atualiza `solicitacoes` (mantém status `entregue`), exibe toast "Rascunho salvo. Você pode voltar para finalizar".
+  - **"Finalizar Baixa"** → fluxo atual (atualiza `solicitacoes` com `status`, `valor_gasto_real`, `troco_real`, `data_baixa`, devolução de troco ao fundo). Confirmação obrigatória se total < entregue (avisa que troco será devolvido como diferença não gasta).
+- Mostrar banner "Você tem N nota(s) salva(s) totalizando R$ X. Adicione mais ou finalize a baixa." quando há rascunho.
+- Permitir excluir notas salvas (já há RLS para isso).
 
-### 3. Forçar JSON estruturado na OpenAI
-- No request à Responses API, adicionar `text: { format: { type: "json_object" } }` para garantir saída JSON válida.
-- Idem no Chat Completions (imagens): `response_format: { type: "json_object" }`.
+### 2. Indicação visual de "baixa parcial" 
+Onde a lista de solicitações mostra status `entregue`, verificar se já existe pelo menos 1 nota em `solicitacao_notas` e mostrar badge adicional "Baixa parcial" (ex.: `src/pages/user/MinhasSolicitacoes.tsx` e admin equivalente).
 
-### 4. Modelo recomendado para PDFs
-- Se `provider === 'openai'` e `isPDF`, usar `gpt-4o` mesmo que `openai_model` esteja como `gpt-4o-mini` (mini tem qualidade insuficiente para extração de NF em PDF). Logar quando o upgrade ocorrer.
-- Alternativamente, atualizar a UI da aba IA para recomendar `gpt-4o` como padrão.
+- Buscar contagem de notas por solicitação (uma única query agregando) e exibir badge secundário quando count > 0 e status = `entregue`.
 
-### 5. Retorno mais informativo ao frontend
-- Quando o parse falhar, devolver `error` com uma amostra do conteúdo recebido (truncada) para o admin ver no toast/console e poder reportar.
+### 3. Componente `NotasFiscaisManager`
+Já suporta lista controlada — só precisa pré-popular com notas existentes do banco e marcar quais já estão persistidas (não reupload). Adicionar prop `notasExistentes` e tratar exclusão (delete em `solicitacao_notas` + remoção do storage).
 
-## Próximo passo após aprovação
-
-Após aplicar essas mudanças, peço para a Stefhane (ou você) reenviar a mesma nota. Com os novos logs vou identificar exatamente o motivo (modelo fraco, formato inesperado, PDF ilegível) e ajustar pontualmente.
+### 4. Sem mudança de schema
+Não precisa nova coluna nem novo status: a presença de registros em `solicitacao_notas` com status ainda `entregue` já indica "baixa parcial em andamento".
 
 ## Arquivos afetados
 
-- `supabase/functions/leitor-notas/index.ts` — logs, parse robusto, `json_object`, upgrade automático de modelo para PDFs.
-- (Opcional) `src/pages/admin/configuracoes/InteligenciaArtificial.tsx` — destacar `gpt-4o` como recomendado para NFs em PDF.
+- `src/pages/user/Baixa.tsx` — dois botões, carregar notas existentes, lógica de rascunho.
+- `src/components/baixa/NotasFiscaisManager.tsx` — suportar notas pré-existentes (marcador `persisted`) e exclusão.
+- `src/pages/user/MinhasSolicitacoes.tsx` (ou onde lista solicitações `entregue`) — badge "Baixa parcial".
+- (Opcional) `src/pages/admin/Solicitacoes.tsx` e `src/pages/admin/BaixasPendentes.tsx` — mesmo badge para admin enxergar.
 
 Sem migrações de banco. Sem novos secrets.
