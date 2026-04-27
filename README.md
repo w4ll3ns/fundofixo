@@ -2,7 +2,31 @@
 
 ## Project info
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+**URL**: https://lovable.dev/projects/<seu-project-id>
+
+## Variáveis de ambiente
+
+Este projeto usa as seguintes variáveis (prefixo `VITE_`, expostas ao frontend):
+
+- `VITE_SUPABASE_PROJECT_ID`
+- `VITE_SUPABASE_PUBLISHABLE_KEY`
+- `VITE_SUPABASE_URL`
+
+### Dentro do Lovable Cloud
+
+Não é necessário configurar nada manualmente. O arquivo `.env` é provisionado e atualizado automaticamente pela plataforma a cada build — não edite esse arquivo à mão.
+
+### Desenvolvendo localmente fora do Lovable
+
+1. Copie o arquivo de exemplo:
+   ```sh
+   cp .env.example .env
+   ```
+2. Preencha os valores com as credenciais do seu projeto Supabase (disponíveis no painel do Supabase em *Project Settings → API*).
+
+### Sobre segurança
+
+A `VITE_SUPABASE_PUBLISHABLE_KEY` é a **anon key** pública do Supabase, projetada para ser embutida no bundle do frontend. A segurança dos dados é garantida pelas **políticas de Row Level Security (RLS)** configuradas no banco, e não por manter essa chave em segredo. Segredos sensíveis (service role key, chaves de APIs de terceiros, etc.) **não** ficam em `.env` — eles são armazenados no cofre de secrets do Lovable Cloud e acessados apenas pelas Edge Functions.
 
 ## How can I edit this code?
 
@@ -10,7 +34,7 @@ There are several ways of editing your application.
 
 **Use Lovable**
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+Simply visit the [Lovable Project](https://lovable.dev/projects/<seu-project-id>) and start prompting.
 
 Changes made via Lovable will be committed automatically to this repo.
 
@@ -62,7 +86,7 @@ This project is built with:
 
 ## How can I deploy this project?
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+Simply open [Lovable](https://lovable.dev/projects/<seu-project-id>) and click on Share -> Publish.
 
 ## Can I connect a custom domain to my Lovable project?
 
