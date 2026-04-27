@@ -406,6 +406,41 @@ export function NotasFiscaisManager({ notas, onChange, storagePathPrefix, inputI
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={notaToRemove !== null} onOpenChange={(open) => !open && setNotaToRemove(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remover nota fiscal?</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2">
+                <p>Esta ação não pode ser desfeita. A nota será removida da lista{notaToRemove && originalDbIdsHint(notaToRemove) ? ' e excluída ao salvar' : ''}.</p>
+                {notaToRemove && (
+                  <div className="rounded-md border border-border bg-muted/30 p-3 text-sm text-foreground">
+                    <p className="font-medium truncate">{notaToRemove.nome_emitente || notaToRemove.fileName || 'Nota fiscal'}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {notaToRemove.numero_nota ? `Nº ${notaToRemove.numero_nota}` : 'Sem número'}
+                      {' • '}
+                      {formatCurrency(Number(notaToRemove.valor))}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (notaToRemove) handleRemove(notaToRemove.id);
+                setNotaToRemove(null);
+              }}
+            >
+              Remover
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
