@@ -260,7 +260,8 @@ export default function AdminSolicitacoes() {
 
   const filtered = solicitacoes.filter(s => {
     const matchesSearch = s.empresas?.nome_fantasia.toLowerCase().includes(search.toLowerCase()) ||
-      s.profiles?.nome.toLowerCase().includes(search.toLowerCase());
+      s.profiles?.nome.toLowerCase().includes(search.toLowerCase()) ||
+      (s.nome_emitente?.toLowerCase().includes(search.toLowerCase()) ?? false);
     
     // Filtro por mês de competência
     if (mesCompetencia !== 'all' && s.data_emissao_nota) {
