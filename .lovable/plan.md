@@ -1,62 +1,43 @@
-# Correção de saldo + idempotência da exclusão de baixa pendente
+## Validação de Consistência de Saldo
 
-## Diagnóstico
+Adicionar uma checagem automática que compara `fundos.saldo_atual` com o saldo derivado do `historico_fundos`, alertando o admin quando houver divergência.
 
-Saldo da **OXYGENI HUB** está em **R$ 2.581,49**, mas deveria ser **R$ 2.281,49**.
+### Abordagem de cálculo
 
-A baixa pendente da solicitação `360583a6-...` (Stefhane, R$ 50) foi tentada **4 vezes** porque o trigger `update_historico_fundos_updated_at` (já corrigido) interrompia o fluxo **depois** que o saldo já tinha sido creditado e o histórico inserido. A solicitação não chegou a ser apagada (status ainda `entregue`) e o usuário clicava de novo, gerando 4 créditos de R$ 50 em vez de 1.
+Para cada fundo, considerar o **`saldo_posterior` do registro mais recente** em `historico_fundos` como saldo esperado. Essa é a fonte mais confiável porque os valores em `tipo='ajuste'` já vêm com sinal embutido (positivo ou negativo), o que torna inseguro recomputar via `SUM(valor * sinal_do_tipo)`.
 
-Histórico mostra 4 entradas idênticas de "Estorno por exclusão de baixa pendente" para a mesma `solicitacao_id`. Excesso = 3 × R$ 50 = **R$ 150**.
+- Saldo esperado = `saldo_posterior` da última transação (ORDER BY `created_at` DESC)
+- Se não houver histórico, esperado = 0
+- Divergência = `|saldo_atual - saldo_esperado| > 0.01`
 
-Já foi inserido um registro no `historico_fundos` documentando a correção (`valor = -150`, descrição "Correção: estorno duplicado..."). Falta apenas atualizar o saldo do fundo.
+### Implementação
 
-## Ações
+**1. Hook `useAuditoriaSaldos`** (`src/hooks/useAuditoriaSaldos.ts`)
+- Busca todos os fundos + última entrada do histórico de cada um
+- Retorna lista de `{ fundo_id, empresa_nome, saldo_atual, saldo_esperado, diferenca, ultima_movimentacao_em }`
+- Filtra apenas divergências (>= R$ 0,01)
 
-### 1. Corrigir o saldo (migration)
+**2. Componente `AlertaDivergenciaSaldo`** (`src/components/admin/AlertaDivergenciaSaldo.tsx`)
+- Card de alerta exibido no topo do `Dashboard` admin e em `GestaoSaldo`
+- Mostra apenas quando há divergências
+- Lista cada fundo divergente: empresa, saldo atual, esperado, diferença (com cor)
+- Botão "Ver histórico" abre o modal de histórico do fundo correspondente
+- Botão "Corrigir saldo" (admin) abre dialog para registrar um `ajuste` igual à diferença com descrição obrigatória, alinhando `fundos.saldo_atual` ao esperado
 
-```sql
-UPDATE public.fundos
-SET saldo_atual = 2431.49
-WHERE id = 'ad43cc52-2853-40d8-bfef-b409b7900b6f';
-```
+**3. Integração no Dashboard admin** (`src/pages/admin/Dashboard.tsx`)
+- Renderizar `<AlertaDivergenciaSaldo />` acima dos KPIs
 
-Resultado: saldo passa de R$ 2.581,49 → R$ 2.431,49.
+**4. Integração em GestaoSaldo** (`src/pages/admin/GestaoSaldo.tsx`)
+- Renderizar `<AlertaDivergenciaSaldo />` no topo da página
+- Adicionar badge "⚠ Divergência" na linha do fundo divergente da tabela
 
-> Observação: o saldo "verdadeiro" considerando o estorno legítimo de R$ 50 da baixa cancelada é R$ 2.281,49. Mas como a solicitação `360583a6-...` ainda existe com status `entregue`, ela **continua descontada** do saldo. Ao excluí-la corretamente (próxima ação), o saldo será creditado de R$ 50, fechando em R$ 2.281,49. Por isso o ajuste é R$ -150 (não R$ -200).
+### Comportamento da correção
 
-### 2. Tornar `ModalExcluirBaixa` idempotente
+Ao clicar em "Corrigir saldo":
+1. Insere registro em `historico_fundos` com `tipo='ajuste'`, `valor = saldo_esperado - saldo_atual`, `saldo_anterior = saldo_atual`, `saldo_posterior = saldo_esperado`, `descricao` informada pelo admin (obrigatória, sugerido prefixo "Reconciliação automática:")
+2. Atualiza `fundos.saldo_atual = saldo_esperado`
+3. Recarrega a auditoria
 
-Antes de creditar e inserir histórico, verificar se já existe um registro de estorno para a mesma `solicitacao_id` com `descricao` contendo "Estorno por exclusão de baixa pendente". Se existir, pular o passo 1 (apenas seguir para apagar arquivo + notificações + solicitação).
-
-```ts
-// Antes do crédito:
-const { data: jaEstornado } = await supabase
-  .from('historico_fundos')
-  .select('id')
-  .eq('solicitacao_id', solicitacao.id)
-  .ilike('descricao', 'Estorno por exclusão de baixa pendente%')
-  .limit(1)
-  .maybeSingle();
-
-if (jaEstornado) {
-  // pula crédito e histórico — já foi feito numa tentativa anterior
-} else {
-  // ... fluxo atual de crédito + insert no histórico
-}
-```
-
-Isso garante que retentar a exclusão (após erro de rede, trigger, RLS etc.) não duplique créditos.
-
-### 3. (Opcional) Excluir a solicitação `360583a6-...` agora que o fluxo está correto
-
-Após o fix do saldo + idempotência, basta clicar em "Excluir baixa" novamente na UI — o passo 1 será pulado (já há estorno), o passo 4 vai apagar a solicitação e o saldo cairá de R$ 2.431,49 para R$ 2.281,49 automaticamente via novo crédito? Não — exatamente o oposto: como pulamos o crédito, o saldo permanece R$ 2.431,49, mas a solicitação some. O valor de R$ 50 que ela "ainda descontava" precisa ser creditado.
-
-**Refinamento**: a checagem de idempotência deve ser por **soma**: se já há estorno cobrindo o `valor_entregue`, pula. Caso contrário, credita o que faltar. Implementação simples para este caso: somar `valor` dos históricos de "Estorno por exclusão de baixa pendente" para essa solicitação. Se já ≥ `valor_entregue`, pula.
-
-### Resumo do código a alterar
-
-`src/components/admin/ModalExcluirBaixa.tsx`: adicionar checagem antes do bloco de crédito (linhas 66–96).
-
-## Fora de escopo
-
-- Auditar outros lugares que possam sofrer do mesmo problema (criação manual de fundo, baixa normal). O risco era específico do trigger removido e já foi mitigado.
+### Fora do escopo
+- Recomputar saldo a partir de `solicitacoes` (a fonte de verdade transacional já é o `historico_fundos`)
+- Job em background — a checagem roda no carregamento das telas admin acima

@@ -9,6 +9,7 @@ import { formatCurrency, formatDate } from '@/lib/masks';
 import { Clock, Wallet, CheckCircle, ArrowDownRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
+import { AlertaDivergenciaSaldo } from '@/components/admin/AlertaDivergenciaSaldo';
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
@@ -46,6 +47,8 @@ export default function AdminDashboard() {
     <AppLayout>
       <div className="space-y-6 animate-fade-in">
         <h1 className="text-2xl font-bold">Dashboard Administrativo</h1>
+
+        <AlertaDivergenciaSaldo />
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <StatCard title="Saldo Disponível" value={formatCurrency(stats.saldoTotal)} icon={<Wallet className="h-5 w-5" />} variant="success" />

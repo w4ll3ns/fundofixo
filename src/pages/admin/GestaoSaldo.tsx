@@ -13,6 +13,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatCurrency, formatDateTime, maskCurrency, parseCurrency } from '@/lib/masks';
 import { Plus, History, Wallet, AlertTriangle, ArrowUp, ArrowDown } from 'lucide-react';
+import { AlertaDivergenciaSaldo } from '@/components/admin/AlertaDivergenciaSaldo';
 
 interface Empresa {
   id: string;
@@ -181,6 +182,8 @@ export default function GestaoSaldo() {
             Adicionar Saldo
           </Button>
         </div>
+
+        <AlertaDivergenciaSaldo />
 
         {/* Summary Cards */}
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
