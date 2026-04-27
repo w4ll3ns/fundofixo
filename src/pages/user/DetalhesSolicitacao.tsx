@@ -156,6 +156,36 @@ export default function DetalhesSolicitacao() {
               </div>
             )}
 
+            {/* Ajuste resolvido pelo admin */}
+            {ajusteResolvido && (
+              <div className="p-4 rounded-lg bg-primary/5 border border-primary/20 space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-medium text-primary">Ajuste Resolvido pelo Admin</p>
+                  {solicitacao.data_ajuste && (
+                    <p className="text-xs text-muted-foreground">{formatDate(solicitacao.data_ajuste)}</p>
+                  )}
+                </div>
+                <p className="text-sm">
+                  <strong>
+                    {solicitacao.tipo_ajuste === 'complemento_fundo'
+                      ? 'Complemento do fundo fixo'
+                      : 'Reembolso ao usuário'}
+                  </strong>
+                  {solicitacao.valor_ajuste != null && (
+                    <span className="text-muted-foreground"> · {formatCurrency(solicitacao.valor_ajuste)}</span>
+                  )}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {solicitacao.tipo_ajuste === 'complemento_fundo'
+                    ? 'O excedente foi registrado como retirada adicional do fundo fixo da empresa.'
+                    : 'O usuário pagou com recursos próprios e será reembolsado pela empresa.'}
+                </p>
+                {solicitacao.observacao_ajuste && (
+                  <p className="text-sm p-2 rounded bg-background/60 mt-2">{solicitacao.observacao_ajuste}</p>
+                )}
+              </div>
+            )}
+
             {/* Dates and Info */}
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="flex items-center gap-3">
