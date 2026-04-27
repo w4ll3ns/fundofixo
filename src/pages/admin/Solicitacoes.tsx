@@ -590,6 +590,7 @@ export default function AdminSolicitacoes() {
                             >
                               <Scale className="h-4 w-4" />
                             </Button>
+                          )}
                           {(sol.status === 'baixada' || sol.status === 'pendente_ajuste') && (
                             <Button
                               size="sm"
