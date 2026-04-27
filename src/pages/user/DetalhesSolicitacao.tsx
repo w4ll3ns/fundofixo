@@ -349,6 +349,13 @@ export default function DetalhesSolicitacao() {
           </CardContent>
         </Card>
       </div>
+
+      <ModalExcluirBaixa
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        solicitacao={solicitacao as any}
+        onSuccess={() => navigate('/admin/baixas-pendentes')}
+      />
     </AppLayout>
   );
 }
