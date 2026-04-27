@@ -136,6 +136,17 @@ export default function BaixasPendentes() {
     fetchData();
   };
 
+  const handleOpenDelete = (sol: Solicitacao) => {
+    setSelectedToDelete(sol);
+    setDeleteModalOpen(true);
+  };
+
+  const handleDeleteSuccess = () => {
+    setDeleteModalOpen(false);
+    setSelectedToDelete(null);
+    fetchData();
+  };
+
   const SortHeader = ({ field, children }: { field: SortField; children: React.ReactNode }) => (
     <th 
       className="text-left py-3 px-2 text-sm font-medium text-muted-foreground cursor-pointer hover:text-foreground transition-colors"
