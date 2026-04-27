@@ -453,6 +453,9 @@ export default function AdminSolicitacoes() {
                       </td>
                       <td className="py-3 px-4 text-sm font-medium">{formatCurrency(sol.valor_solicitado)}</td>
                       <td className="py-3 px-4 text-sm">{sol.valor_entregue ? formatCurrency(sol.valor_entregue) : '-'}</td>
+                      <td className={`py-3 px-4 text-sm ${sol.valor_gasto_real != null && sol.valor_entregue != null && sol.valor_gasto_real > sol.valor_entregue ? 'text-destructive font-medium' : ''}`}>
+                        {sol.valor_gasto_real != null ? formatCurrency(sol.valor_gasto_real) : '-'}
+                      </td>
                       <td className="py-3 px-4 text-sm">{sol.data_emissao_nota ? formatDate(sol.data_emissao_nota) : '-'}</td>
                       <td className="py-3 px-4"><StatusBadge status={sol.status} /></td>
                       <td className="py-3 px-4">
