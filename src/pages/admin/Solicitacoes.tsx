@@ -297,9 +297,7 @@ export default function AdminSolicitacoes() {
         data_baixa: null,
         valor_gasto_real: null,
         troco_real: null,
-        observacoes_admin: selectedSolicitacao.status
-          ? obsAppend
-          : obsAppend,
+        observacoes_admin: obsAppend,
       }).eq('id', selectedSolicitacao.id);
       if (updSolError) throw updSolError;
 
