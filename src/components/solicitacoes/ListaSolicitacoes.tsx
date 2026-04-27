@@ -22,6 +22,7 @@ interface Solicitacao {
   justificativa: string;
   data_emissao_nota: string | null;
   empresas: { nome_fantasia: string } | null;
+  notas_count?: number;
 }
 
 interface ListaSolicitacoesProps {
@@ -52,7 +53,27 @@ export function ListaSolicitacoes({ defaultStatusFilter }: ListaSolicitacoesProp
       }
 
       const { data } = await query;
-      if (data) setSolicitacoes(data as Solicitacao[]);
+      if (data) {
+        // Buscar contagem de notas para detectar "baixa parcial" em status 'entregue'/'pendente_ajuste'
+        const idsParaContar = data
+          .filter((s: any) => s.status === 'entregue' || s.status === 'pendente_ajuste')
+          .map((s: any) => s.id);
+
+        let countMap = new Map<string, number>();
+        if (idsParaContar.length > 0) {
+          const { data: notas } = await supabase
+            .from('solicitacao_notas')
+            .select('solicitacao_id')
+            .in('solicitacao_id', idsParaContar);
+          notas?.forEach((n: any) => {
+            countMap.set(n.solicitacao_id, (countMap.get(n.solicitacao_id) || 0) + 1);
+          });
+        }
+
+        setSolicitacoes(
+          (data as Solicitacao[]).map(s => ({ ...s, notas_count: countMap.get(s.id) || 0 }))
+        );
+      }
       setLoading(false);
     };
 
@@ -120,7 +141,14 @@ export function ListaSolicitacoes({ defaultStatusFilter }: ListaSolicitacoesProp
                     <p className="font-medium truncate">{sol.empresas?.nome_fantasia}</p>
                     <p className="text-xs text-muted-foreground">{formatDate(sol.created_at)}</p>
                   </div>
-                  <StatusBadge status={sol.status} />
+                  <div className="flex flex-col items-end gap-1">
+                    <StatusBadge status={sol.status} />
+                    {sol.status === 'entregue' && (sol.notas_count || 0) > 0 && (
+                      <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-primary/10 text-primary">
+                        Baixa parcial · {sol.notas_count}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 
                 <div className="grid grid-cols-2 gap-2 text-sm">
@@ -143,7 +171,9 @@ export function ListaSolicitacoes({ defaultStatusFilter }: ListaSolicitacoesProp
                 <div className="flex gap-2 pt-2">
                   {(sol.status === 'entregue' || sol.status === 'pendente_ajuste') && (
                     <Button size="sm" className="flex-1 h-10" asChild>
-                      <Link to={`/baixa/${sol.id}`}>Fazer Baixa</Link>
+                      <Link to={`/baixa/${sol.id}`}>
+                        {(sol.notas_count || 0) > 0 ? 'Continuar Baixa' : 'Fazer Baixa'}
+                      </Link>
                     </Button>
                   )}
                   <Button size="sm" variant="outline" className="flex-1 h-10" asChild>
@@ -179,12 +209,23 @@ export function ListaSolicitacoes({ defaultStatusFilter }: ListaSolicitacoesProp
                     <td className="py-3 px-4 text-sm font-medium">{formatCurrency(sol.valor_solicitado)}</td>
                     <td className="py-3 px-4 text-sm">{sol.valor_entregue ? formatCurrency(sol.valor_entregue) : '-'}</td>
                     <td className="py-3 px-4 text-sm">{sol.data_emissao_nota ? formatDate(sol.data_emissao_nota) : '-'}</td>
-                    <td className="py-3 px-4"><StatusBadge status={sol.status} /></td>
+                    <td className="py-3 px-4">
+                      <div className="flex flex-col gap-1 items-start">
+                        <StatusBadge status={sol.status} />
+                        {sol.status === 'entregue' && (sol.notas_count || 0) > 0 && (
+                          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-primary/10 text-primary">
+                            Baixa parcial · {sol.notas_count}
+                          </span>
+                        )}
+                      </div>
+                    </td>
                     <td className="py-3 px-4">
                       <div className="flex gap-2">
                         {(sol.status === 'entregue' || sol.status === 'pendente_ajuste') && (
                           <Button size="sm" asChild>
-                            <Link to={`/baixa/${sol.id}`}>Fazer Baixa</Link>
+                            <Link to={`/baixa/${sol.id}`}>
+                              {(sol.notas_count || 0) > 0 ? 'Continuar' : 'Fazer Baixa'}
+                            </Link>
                           </Button>
                         )}
                         <Button size="sm" variant="ghost" asChild>
