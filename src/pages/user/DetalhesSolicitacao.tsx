@@ -272,66 +272,26 @@ export default function DetalhesSolicitacao() {
               </div>
             )}
 
-            {/* Nota Fiscal Section */}
-            {solicitacao.upload_nota_fiscal_url && (
+            {/* Notas Fiscais */}
+            {(solicitacao.status === 'baixada' || solicitacao.status === 'pendente_ajuste' || solicitacao.upload_nota_fiscal_url) && (
               <div className="space-y-4 pt-4 border-t">
                 <div className="flex items-center gap-2">
                   <Receipt className="h-5 w-5 text-primary" />
-                  <h3 className="font-semibold">Nota Fiscal Anexada</h3>
+                  <h3 className="font-semibold">Notas Fiscais Anexadas</h3>
                 </div>
-
-                {/* AI Extracted Data */}
-                {(solicitacao.numero_nota || solicitacao.nome_emitente || solicitacao.ai_valor_extraido) && (
-                  <div className="p-4 rounded-lg bg-muted/50 space-y-3">
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Bot className="h-4 w-4" />
-                      <span>Dados extraídos automaticamente</span>
-                      {solicitacao.ai_confianca && (
-                        <Badge variant={
-                          solicitacao.ai_confianca === 'alta' ? 'default' :
-                          solicitacao.ai_confianca === 'media' ? 'secondary' : 'destructive'
-                        }>
-                          Confiança {solicitacao.ai_confianca}
-                        </Badge>
-                      )}
-                    </div>
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      {solicitacao.numero_nota && (
-                        <div>
-                          <p className="text-xs text-muted-foreground">Número da Nota</p>
-                          <p className="font-medium">{solicitacao.numero_nota}</p>
-                        </div>
-                      )}
-                      {solicitacao.data_emissao_nota && (
-                        <div>
-                          <p className="text-xs text-muted-foreground">Data de Emissão</p>
-                          <p className="font-medium">{formatDate(solicitacao.data_emissao_nota)}</p>
-                        </div>
-                      )}
-                      {solicitacao.nome_emitente && (
-                        <div>
-                          <p className="text-xs text-muted-foreground">Emitente</p>
-                          <p className="font-medium">{solicitacao.nome_emitente}</p>
-                        </div>
-                      )}
-                      {solicitacao.cnpj_emitente && (
-                        <div>
-                          <p className="text-xs text-muted-foreground">CNPJ Emitente</p>
-                          <p className="font-medium">{solicitacao.cnpj_emitente}</p>
-                        </div>
-                      )}
-                      {solicitacao.ai_valor_extraido && (
-                        <div>
-                          <p className="text-xs text-muted-foreground">Valor Extraído (IA)</p>
-                          <p className="font-medium">{formatCurrency(solicitacao.ai_valor_extraido)}</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* File Preview */}
-                <NotaFiscalPreview filePath={solicitacao.upload_nota_fiscal_url} />
+                <NotasFiscaisList
+                  solicitacaoId={solicitacao.id}
+                  legacy={{
+                    upload_nota_fiscal_url: solicitacao.upload_nota_fiscal_url,
+                    numero_nota: solicitacao.numero_nota,
+                    nome_emitente: solicitacao.nome_emitente,
+                    cnpj_emitente: solicitacao.cnpj_emitente,
+                    data_emissao_nota: solicitacao.data_emissao_nota,
+                    ai_valor_extraido: solicitacao.ai_valor_extraido,
+                    ai_confianca: solicitacao.ai_confianca as 'alta' | 'media' | 'baixa' | null,
+                    valor_gasto_real: solicitacao.valor_gasto_real,
+                  }}
+                />
               </div>
             )}
 
