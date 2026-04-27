@@ -341,8 +341,46 @@ export default function BaixasPendentes() {
                                 <Download className="h-4 w-4 mr-1" />
                                 Baixa
                               </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                onClick={() => handleOpenDelete(sol)}
+                                aria-label="Excluir baixa"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
                             </div>
                           </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Modal de Baixa */}
+      <ModalBaixaAdmin
+        open={modalOpen}
+        onOpenChange={setModalOpen}
+        solicitacao={selectedSolicitacao}
+        onSuccess={handleBaixaSuccess}
+      />
+
+      {/* Modal de Exclusão */}
+      <ModalExcluirBaixa
+        open={deleteModalOpen}
+        onOpenChange={setDeleteModalOpen}
+        solicitacao={selectedToDelete}
+        onSuccess={handleDeleteSuccess}
+      />
+    </AppLayout>
+  );
+}
                         </tr>
                       );
                     })}
