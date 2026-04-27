@@ -1,43 +1,60 @@
-## Validação de Consistência de Saldo
+# Correção da baixa de COMPRA_AVULSA — saldo do fundo
 
-Adicionar uma checagem automática que compara `fundos.saldo_atual` com o saldo derivado do `historico_fundos`, alertando o admin quando houver divergência.
+## Diagnóstico
 
-### Abordagem de cálculo
+Analisando a última baixa de hoje (id `e7107bef-...`, "TESTE DO VALOR", COMPRA_AVULSA):
 
-Para cada fundo, considerar o **`saldo_posterior` do registro mais recente** em `historico_fundos` como saldo esperado. Essa é a fonte mais confiável porque os valores em `tipo='ajuste'` já vêm com sinal embutido (positivo ou negativo), o que torna inseguro recomputar via `SUM(valor * sinal_do_tipo)`.
+| Campo | Valor |
+|---|---|
+| valor_solicitado / valor_entregue | R$ 300,00 |
+| **valor_gasto_real (digitado na baixa)** | **R$ 110,60** |
+| troco_real | R$ 189,40 |
+| status | baixada |
 
-- Saldo esperado = `saldo_posterior` da última transação (ORDER BY `created_at` DESC)
-- Se não houver histórico, esperado = 0
-- Divergência = `|saldo_atual - saldo_esperado| > 0.01`
+Os dados foram gravados corretamente em `solicitacoes`. **O problema não está na gravação** — está no **impacto sobre o saldo do fundo**.
 
-### Implementação
+### Causa raiz
 
-**1. Hook `useAuditoriaSaldos`** (`src/hooks/useAuditoriaSaldos.ts`)
-- Busca todos os fundos + última entrada do histórico de cada um
-- Retorna lista de `{ fundo_id, empresa_nome, saldo_atual, saldo_esperado, diferenca, ultima_movimentacao_em }`
-- Filtra apenas divergências (>= R$ 0,01)
+Hoje a regra é:
+- **FUNDO_FIXO**: debita `valor_entregue` na aprovação. Ao baixar, devolve `troco_real` se positivo. Resultado líquido = `valor_gasto_real`. ✅
+- **COMPRA_AVULSA**: **não impacta o saldo do fundo** em nenhum momento (nem na aprovação, nem na baixa). ❌
 
-**2. Componente `AlertaDivergenciaSaldo`** (`src/components/admin/AlertaDivergenciaSaldo.tsx`)
-- Card de alerta exibido no topo do `Dashboard` admin e em `GestaoSaldo`
-- Mostra apenas quando há divergências
-- Lista cada fundo divergente: empresa, saldo atual, esperado, diferença (com cor)
-- Botão "Ver histórico" abre o modal de histórico do fundo correspondente
-- Botão "Corrigir saldo" (admin) abre dialog para registrar um `ajuste` igual à diferença com descrição obrigatória, alinhando `fundos.saldo_atual` ao esperado
+Mas no fluxo real desta baixa, a Stefhane recebeu R$ 300 do caixa físico para uma compra avulsa, gastou R$ 110,60 e deveria devolver R$ 189,40 ao caixa — porém o sistema **não registrou nada disso no fundo**. Daí a percepção de que "baixou pelo valor solicitado": o saldo continua como se nada tivesse saído nem voltado, mas no caixa físico saíram R$ 110,60.
 
-**3. Integração no Dashboard admin** (`src/pages/admin/Dashboard.tsx`)
-- Renderizar `<AlertaDivergenciaSaldo />` acima dos KPIs
+Adicionalmente, a regra atual de devolução de troco (`Baixa.tsx` linha 189 e `ModalBaixaAdmin.tsx` linha 189) roda mesmo para COMPRA_AVULSA, **creditando** troco num saldo que nunca foi debitado — o que inflaria o fundo se o usuário tivesse usado dinheiro do fundo. Felizmente, neste caso não disparou porque a COMPRA_AVULSA foi tratada à parte do fundo, mas o código está logicamente inconsistente.
 
-**4. Integração em GestaoSaldo** (`src/pages/admin/GestaoSaldo.tsx`)
-- Renderizar `<AlertaDivergenciaSaldo />` no topo da página
-- Adicionar badge "⚠ Divergência" na linha do fundo divergente da tabela
+## Decisão de regra (a confirmar pelo usuário no plano)
 
-### Comportamento da correção
+Tratar COMPRA_AVULSA com a **mesma mecânica do FUNDO_FIXO** quando o dinheiro sai do caixa físico:
+1. Na **aprovação** (`ModalAprovacao` / endpoint de aprovação): debitar `valor_entregue` do `fundos.saldo_atual` e registrar `historico_fundos` com `tipo='saida'`, `descricao='Adiantamento compra avulsa - <solicitante>'`.
+2. Na **baixa** com `troco_real > 0`: creditar o troco e registrar `tipo='devolucao_troco'` (já existe).
+3. Na **baixa** com `valor_gasto_real > valor_entregue` (`pendente_ajuste`): nenhum efeito até o admin resolver o ajuste (igual ao FUNDO_FIXO).
 
-Ao clicar em "Corrigir saldo":
-1. Insere registro em `historico_fundos` com `tipo='ajuste'`, `valor = saldo_esperado - saldo_atual`, `saldo_anterior = saldo_atual`, `saldo_posterior = saldo_esperado`, `descricao` informada pelo admin (obrigatória, sugerido prefixo "Reconciliação automática:")
-2. Atualiza `fundos.saldo_atual = saldo_esperado`
-3. Recarrega a auditoria
+Resultado para a baixa de hoje, retroativamente: deveria existir `-R$ 300` (saída) e `+R$ 189,40` (troco) no histórico → impacto líquido `-R$ 110,60`.
 
-### Fora do escopo
-- Recomputar saldo a partir de `solicitacoes` (a fonte de verdade transacional já é o `historico_fundos`)
-- Job em background — a checagem roda no carregamento das telas admin acima
+## Mudanças propostas
+
+### 1. Aprovação (debitar fundo também para COMPRA_AVULSA)
+
+Localizar onde a aprovação atualiza `solicitacoes.status = 'entregue'` (a request PATCH do log) e replicar para COMPRA_AVULSA o mesmo bloco de débito do fundo já usado em FUNDO_FIXO. Buscar com `rg "tipo_solicitacao.*FUNDO_FIXO" src` para identificar o ponto exato (provavelmente `src/pages/admin/Solicitacoes.tsx` ou um modal de aprovação).
+
+### 2. Baixa (`src/pages/user/Baixa.tsx` e `src/components/admin/ModalBaixaAdmin.tsx`)
+
+A devolução de troco (linhas 188-216 em ambos) já é genérica — passa a ser correta para os dois tipos uma vez que a aprovação debite o fundo.
+
+### 3. Migração de correção (data fix)
+
+Para a solicitação `e7107bef-584f-4e7e-baa6-dada40128d21` (já baixada e que afetou caixa físico):
+- Inserir em `historico_fundos`:
+  - `tipo='saida'`, `valor=-300`, `saldo_anterior=2431.49`, `saldo_posterior=2131.49`, `descricao='Ajuste retroativo: adiantamento compra avulsa TESTE DO VALOR'`
+  - `tipo='devolucao_troco'`, `valor=189.40`, `saldo_anterior=2131.49`, `saldo_posterior=2320.89`, `descricao='Ajuste retroativo: troco compra avulsa TESTE DO VALOR'`
+- Atualizar `fundos.saldo_atual` para **R$ 2.320,89**.
+
+> **Atenção**: isto contradiz a memória `request-types-and-balance-impact` que diz "COMPRA_AVULSA does not reduce balance". Essa memória será atualizada caso você confirme a nova regra.
+
+## Pergunta antes de executar
+
+A COMPRA_AVULSA, na prática operacional de vocês, **sai do mesmo caixa físico do fundo fixo** (precisa debitar e devolver troco) ou é um pagamento por outro meio (cartão corporativo / reembolso) que **não toca o caixa**?
+
+- **Opção A (recomendada se sai do caixa)**: aplicar plano completo acima — debita na aprovação, devolve troco na baixa, e ajusta retroativamente o saldo para R$ 2.320,89.
+- **Opção B (se não toca o caixa)**: nenhuma alteração de regra — apenas ajustar a UI da baixa para não confundir (ex: ocultar bloco de troco quando COMPRA_AVULSA, ou explicitar "não impacta fundo"). Saldo permanece R$ 2.431,49.
