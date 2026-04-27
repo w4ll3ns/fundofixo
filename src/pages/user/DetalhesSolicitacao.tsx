@@ -61,7 +61,7 @@ export default function DetalhesSolicitacao() {
       const { data } = await supabase
         .from('solicitacoes')
         .select(`
-          id, solicitante_user_id, valor_solicitado, valor_entregue, valor_gasto_real, troco_real, status, 
+          id, solicitante_user_id, empresa_id, tipo_solicitacao, valor_solicitado, valor_entregue, valor_gasto_real, troco_real, status, 
           created_at, data_aprovacao, data_baixa, justificativa, categoria, 
           motivo_rejeicao, observacoes_admin, forma_entrega, descricao_compra, 
           upload_nota_fiscal_url, data_emissao_nota, numero_nota, nome_emitente, cnpj_emitente,
