@@ -68,6 +68,7 @@ export function NotasFiscaisManager({ notas, onChange, storagePathPrefix, inputI
   const { toast } = useToast();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [notaToRemove, setNotaToRemove] = useState<NotaFiscalItem | null>(null);
 
   const [uploading, setUploading] = useState(false);
   const [processing, setProcessing] = useState(false);
