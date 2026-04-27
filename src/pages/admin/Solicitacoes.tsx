@@ -129,6 +129,12 @@ export default function AdminSolicitacoes() {
     setDetailDialogOpen(true);
   };
 
+  const openDesfazer = (sol: Solicitacao) => {
+    setSelectedSolicitacao(sol);
+    setMotivoDesfazer('');
+    setDesfazerDialogOpen(true);
+  };
+
   const handleApprove = async () => {
     if (!selectedSolicitacao) return;
     const valor = parseCurrency(valorEntregue);
@@ -489,6 +495,17 @@ export default function AdminSolicitacoes() {
                         Resolver
                       </Button>
                     )}
+                    {(sol.status === 'baixada' || sol.status === 'pendente_ajuste') && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-10 px-4 text-destructive border-destructive hover:bg-destructive/10"
+                        onClick={() => openDesfazer(sol)}
+                      >
+                        <Undo2 className="h-4 w-4 mr-2" />
+                        Desfazer
+                      </Button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -572,6 +589,17 @@ export default function AdminSolicitacoes() {
                               onClick={() => { setSelectedSolicitacao(sol); setAjusteDialogOpen(true); }}
                             >
                               <Scale className="h-4 w-4" />
+                            </Button>
+                          )}
+                          {(sol.status === 'baixada' || sol.status === 'pendente_ajuste') && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="text-destructive hover:text-destructive"
+                              title="Desfazer baixa"
+                              onClick={() => openDesfazer(sol)}
+                            >
+                              <Undo2 className="h-4 w-4" />
                             </Button>
                           )}
                         </div>
