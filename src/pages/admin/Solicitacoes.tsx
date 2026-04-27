@@ -268,35 +268,68 @@ export default function AdminSolicitacoes() {
 
     setDesfazendo(true);
     try {
-      const troco = selectedSolicitacao.troco_real || 0;
       const fundoId = getFundoId(selectedSolicitacao.empresa_id);
 
-      // 1. Estornar troco do fundo (se houver)
-      if (troco > 0 && fundoId) {
+      // 1. Buscar TODOS os lançamentos vinculados a esta solicitação
+      const { data: lancamentos, error: histErr } = await supabase
+        .from('historico_fundos')
+        .select('id, tipo, valor, descricao')
+        .eq('solicitacao_id', selectedSolicitacao.id);
+      if (histErr) throw histErr;
+
+      // 1a. Idempotência: se já houve desfazimento anterior para esta solicitação, abortar.
+      const jaDesfeito = (lancamentos || []).some((l) =>
+        (l.descricao || '').toLowerCase().includes('desfazimento de baixa')
+      );
+      if (jaDesfeito) {
+        toast({
+          title: 'Operação já realizada',
+          description: 'Esta baixa já foi desfeita anteriormente. Verifique o histórico do fundo.',
+          variant: 'destructive',
+        });
+        setDesfazendo(false);
+        return;
+      }
+
+      // 1b. Calcular impacto líquido APENAS dos lançamentos referentes ao troco / ajustes da baixa.
+      // NÃO revertemos a "saida"/"solicitacao_retroativa" original — o valor entregue continua fora do fundo,
+      // pois a solicitação volta ao status "entregue".
+      const tiposReversiveis = new Set(['devolucao_troco', 'ajuste']);
+      const lancamentosReverter = (lancamentos || []).filter((l) =>
+        tiposReversiveis.has(String(l.tipo))
+      );
+      const impactoLiquido = lancamentosReverter.reduce(
+        (sum, l) => sum + Number(l.valor || 0),
+        0,
+      );
+
+      // 2. Aplicar ajuste compensatório se houver impacto a reverter
+      if (fundoId && Math.abs(impactoLiquido) > 0.001) {
         const { data: fundoData, error: fundoFetchError } = await supabase
           .from('fundos').select('saldo_atual').eq('id', fundoId).single();
         if (fundoFetchError) throw fundoFetchError;
 
         const saldoAnterior = Number(fundoData.saldo_atual);
-        const saldoPosterior = saldoAnterior - troco;
+        const saldoPosterior = saldoAnterior - impactoLiquido;
 
         const { error: updFundoError } = await supabase
           .from('fundos').update({ saldo_atual: saldoPosterior }).eq('id', fundoId);
         if (updFundoError) throw updFundoError;
 
-        await supabase.from('historico_fundos').insert({
+        const { error: insHistErr } = await supabase.from('historico_fundos').insert({
           fundo_id: fundoId,
           tipo: 'ajuste',
-          valor: -troco,
-          descricao: `Desfazimento de baixa (estorno do troco): ${motivoDesfazer.substring(0, 200)}`,
+          valor: -impactoLiquido,
+          descricao: `Desfazimento de baixa — reversão líquida de ${lancamentosReverter.length} lançamento(s) vinculado(s) (impacto ${formatCurrency(impactoLiquido)}). Motivo: ${motivoDesfazer.substring(0, 200)}`,
           admin_id: user?.id,
           solicitacao_id: selectedSolicitacao.id,
           saldo_anterior: saldoAnterior,
           saldo_posterior: saldoPosterior,
         });
+        if (insHistErr) throw insHistErr;
       }
 
-      // 2. Reverter solicitação para 'entregue'
+      // 3. Reverter solicitação para 'entregue'
       const obsAppend = `[Baixa desfeita em ${new Date().toLocaleString('pt-BR')}: ${motivoDesfazer}]`;
       const { error: updSolError } = await supabase.from('solicitacoes').update({
         status: 'entregue',
@@ -307,7 +340,7 @@ export default function AdminSolicitacoes() {
       }).eq('id', selectedSolicitacao.id);
       if (updSolError) throw updSolError;
 
-      // 3. Notificar usuário
+      // 4. Notificar usuário
       await supabase.from('notificacoes').insert({
         user_id: selectedSolicitacao.solicitante_user_id,
         titulo: 'Baixa revertida para correção',
@@ -316,7 +349,12 @@ export default function AdminSolicitacoes() {
         link: `/baixa/${selectedSolicitacao.id}`,
       });
 
-      toast({ title: 'Baixa desfeita', description: troco > 0 ? `Troco de ${formatCurrency(troco)} estornado do fundo.` : 'A solicitação voltou para "Baixa pendente".' });
+      toast({
+        title: 'Baixa desfeita',
+        description: Math.abs(impactoLiquido) > 0.001
+          ? `Saldo do fundo ajustado em ${formatCurrency(-impactoLiquido)} (reversão de ${lancamentosReverter.length} lançamento(s)).`
+          : 'A solicitação voltou para "Baixa pendente". Nenhum ajuste de saldo necessário.',
+      });
       setDesfazerDialogOpen(false);
       setDetailDialogOpen(false);
       setMotivoDesfazer('');
