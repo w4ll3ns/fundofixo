@@ -541,12 +541,40 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      aprovar_solicitacao: {
+        Args: {
+          _autorizar_excesso: boolean
+          _forma_entrega: string
+          _justificativa_excesso: string
+          _observacoes: string
+          _solicitacao_id: string
+          _valor_entregue: number
+        }
+        Returns: string
+      }
+      finalizar_baixa: {
+        Args: {
+          _cnpj_emitente: string
+          _data_emissao_nota: string
+          _descricao_compra: string
+          _nome_emitente: string
+          _numero_nota: string
+          _solicitacao_id: string
+          _upload_url: string
+          _valor_gasto_real: number
+        }
+        Returns: string
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
           _user_id: string
         }
         Returns: boolean
+      }
+      rejeitar_solicitacao: {
+        Args: { _motivo: string; _solicitacao_id: string }
+        Returns: string
       }
     }
     Enums: {
