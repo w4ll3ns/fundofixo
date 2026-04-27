@@ -331,6 +331,11 @@ export default function AdminSolicitacoes() {
                     <div className="min-w-0 flex-1">
                       <p className="font-medium truncate">{sol.profiles?.nome || '-'}</p>
                       <p className="text-sm text-muted-foreground truncate">{sol.empresas?.nome_fantasia || '-'}</p>
+                      {sol.nome_emitente && (
+                        <p className="text-xs text-muted-foreground truncate" title={sol.nome_emitente}>
+                          Emitente: {sol.nome_emitente}
+                        </p>
+                      )}
                     </div>
                     <StatusBadge status={sol.status} />
                   </div>
