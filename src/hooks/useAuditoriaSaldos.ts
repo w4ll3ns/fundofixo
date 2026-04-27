@@ -43,8 +43,8 @@ export function useAuditoriaSaldos() {
           .order('created_at', { ascending: false });
 
         const TIPOS_CREDITO = new Set(['entrada', 'adicao', 'devolucao_troco']);
-        const TIPOS_DEBITO = new Set(['saida', 'retirada', 'solicitacao_retroativa']);
-        // 'ajuste' já vem com sinal embutido no valor
+        const TIPOS_DEBITO = new Set(['saida', 'retirada']);
+        // 'ajuste' e 'solicitacao_retroativa' já vêm com sinal embutido no valor
 
         let saldoEsperado = 0;
         let ultimoCreatedAt: string | null = null;
