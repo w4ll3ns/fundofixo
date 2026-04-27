@@ -1,92 +1,72 @@
+# Seletor de Provedor IA com Chave OpenAI Segura
 
-# Baixa com múltiplas notas fiscais
+Adicionar configuração administrativa para escolher entre **Lovable AI** (padrão) e **OpenAI própria**, com gestão segura da chave via secret backend.
 
-Hoje a baixa aceita apenas **uma** nota fiscal por solicitação (campos `upload_nota_fiscal_url`, `numero_nota`, `nome_emitente`, etc. são únicos na tabela `solicitacoes`). Vamos permitir que o usuário anexe **N notas** numa mesma baixa, cada uma com seu valor, e o `valor_gasto_real` final será a **soma** dos valores das notas.
+## 1. Migration — tabela `ai_config`
 
-## Modelo de dados
+Singleton (1 linha) para armazenar preferência de provedor:
 
-Criar nova tabela `solicitacao_notas` (uma linha por nota fiscal anexada à baixa):
+- `id` uuid PK default gen_random_uuid()
+- `provider` text NOT NULL default `'lovable'` — valores: `'lovable'` ou `'openai'`
+- `openai_model` text default `'gpt-4o'`
+- `lovable_model` text default `'google/gemini-2.5-flash'`
+- `updated_at` timestamptz default now()
+- `updated_by` uuid
 
-```text
-solicitacao_notas
-├── id (uuid, PK)
-├── solicitacao_id (uuid, FK lógico → solicitacoes.id, ON DELETE CASCADE)
-├── valor (numeric, NOT NULL)
-├── upload_url (text, NOT NULL)             -- path no bucket notas-fiscais
-├── arquivo_hash (text)                     -- SHA-256 p/ deduplicação
-├── data_emissao (date)
-├── numero_nota (text)
-├── nome_emitente (text)
-├── cnpj_emitente (text)
-├── descricao (text)
-├── ai_valor_extraido (numeric)
-├── ai_confianca (ai_confianca)
-├── ai_evidencia (text)
-├── ai_status (ai_status)
-├── ai_processed_at (timestamptz)
-├── created_at (timestamptz default now())
-└── created_by (uuid)
-```
+**RLS**: SELECT e UPDATE apenas para admins via `has_role(auth.uid(), 'admin')`. Edge functions usam service role para ler.
 
-RLS:
-- SELECT: dono da solicitação OU admin OU consultivo da empresa correspondente
-- INSERT/UPDATE/DELETE: dono da solicitação (status `entregue`/`pendente_ajuste`) OU admin
+A **chave OpenAI nunca é gravada nessa tabela** — fica no secret `OPENAI_API_KEY` da Lovable Cloud (criptografado).
 
-Os campos legados em `solicitacoes` (`upload_nota_fiscal_url`, `numero_nota`, `nome_emitente`, `cnpj_emitente`, `data_emissao_nota`, `ai_*`) ficam preservados para compatibilidade. Na nova baixa eles serão preenchidos com os dados da **primeira** nota anexada (para que telas antigas e a regra de competência mensal — que usa `data_emissao_nota` — continuem funcionando). O `valor_gasto_real` armazena a soma total.
+## 2. Edge Functions
 
-## Fluxo de UI — `src/pages/user/Baixa.tsx`
+### `leitor-notas` (refatorar existente)
+- Lê `ai_config.provider`
+- Se `'lovable'`: fluxo atual (LOVABLE_API_KEY + gateway)
+- Se `'openai'`:
+  - JPG/PNG → `https://api.openai.com/v1/chat/completions` com `gpt-4o` (image_url base64)
+  - PDF → `https://api.openai.com/v1/responses` com `input_file` (suporte nativo)
+  - Mantém tool calling para extração estruturada
+- Erros tratados: 401 (chave inválida), 429 (rate limit), 402/insufficient_quota (sem créditos)
+- Se provider=openai mas secret ausente → mensagem clara para configurar em /admin/configuracoes
 
-Substituir o bloco "upload único + form" por uma **lista de notas anexadas** + botão "Adicionar nota":
+### `set-openai-key` (nova)
+- Valida JWT + role admin
+- Recebe `{ api_key }`, valida formato (`sk-...`, ≥40 chars)
+- Faz call de teste a `https://api.openai.com/v1/models` para confirmar
+- Se válida, persiste como secret via Supabase Management API
+- Retorna apenas `{ ok: true, masked: "sk-...XXXX" }` — nunca a chave em si
 
-```text
-┌─ Notas Fiscais (R$ 200,00 a justificar) ──────────────┐
-│ ✓ Nota #1 — Padaria X ............... R$ 80,00  [✕]   │
-│ ✓ Nota #2 — Posto Y ................. R$ 65,00  [✕]   │
-│ ✓ Nota #3 — Mercado Z ............... R$ 50,00  [✕]   │
-│ [ + Adicionar nota ]                                   │
-│ ─────────────────────────────────────────────────────  │
-│ Total gasto: R$ 195,00   Troco: R$ 5,00 (a devolver)   │
-└────────────────────────────────────────────────────────┘
-```
+## 3. Frontend — Aba "Inteligência Artificial" em `/admin/configuracoes`
 
-Comportamento:
-- "Adicionar nota" abre o mesmo fluxo atual (upload → IA → form com valor / data / número / emitente / CNPJ / descrição) num **dialog/sheet**, com botão "Salvar nota".
-- Ao salvar, a nota vai para a lista local (estado em memória) — ainda não persiste no banco.
-- Cada nota da lista pode ser editada (reabre o dialog) ou removida.
-- Total e troco são recalculados em tempo real: `valor_gasto = Σ notas.valor`, `troco_real = valor_entregue − valor_gasto`.
-- Mantém a regra de status: `troco_real < 0` → `pendente_ajuste`, senão `baixada`.
-- Botão "Confirmar Baixa" exige **pelo menos 1 nota**.
+- **Radio**: Lovable AI (padrão) | OpenAI (minha chave)
+- Se OpenAI: select de modelo (gpt-4o, gpt-4o-mini, gpt-4-turbo)
+- Campo password "Chave API OpenAI":
+  - Botão olho (mostrar/ocultar)
+  - Validação zod: `sk-` + ≥40 chars
+  - Mostra mascarada se já configurada (`sk-•••••XXXX`)
+  - Botão "Testar e salvar" → chama `set-openai-key`
+  - Link "Onde obter minha chave?" → platform.openai.com/api-keys
+- Badge status: verde "Conectado" / vermelho "Não configurado"
+- Aviso: "Sua chave é armazenada criptografada no backend e nunca exposta ao navegador"
 
-Ao confirmar:
-1. Faz upload dos arquivos pendentes para `notas-fiscais` (já é feito hoje no momento da seleção; manter).
-2. `INSERT` em `solicitacao_notas` (uma linha por nota).
-3. `UPDATE` em `solicitacoes` setando `valor_gasto_real`, `troco_real`, `data_baixa`, `status`, e copiando os campos da **primeira nota** para os campos legados (`upload_nota_fiscal_url`, `numero_nota`, `nome_emitente`, `cnpj_emitente`, `data_emissao_nota`, `ai_*`).
-4. Devolução de troco ao fundo permanece igual quando `troco_real > 0` e `status = baixada`.
+## Segurança aplicada
 
-Aplicar exatamente o mesmo padrão em `src/components/admin/ModalBaixaAdmin.tsx` (admin fazendo baixa em nome do usuário).
+- Chave nunca trafega de volta ao frontend após salva
+- Input password + autocomplete=off
+- Validação zod no client e na edge function
+- Edge functions checam `has_role(admin)` antes de qualquer operação
+- RLS em `ai_config` restrita a admins
+- Teste de validade antes de persistir
+- Secret gerenciado pela Lovable Cloud (criptografado)
 
-## Telas de visualização
+## Custo estimado OpenAI
 
-- **`src/pages/user/DetalhesSolicitacao.tsx`** e **`src/pages/admin/Solicitacoes.tsx` (modal de detalhes)**: trocar a seção "Nota Fiscal" por uma **lista** de notas (lê de `solicitacao_notas`). Para cada nota: emitente, número, data, valor, botão "Ver arquivo" usando `NotaFiscalPreview`. Fallback: se não houver registros em `solicitacao_notas` (baixas antigas), usar os campos legados como hoje.
-- **`src/components/admin/ModalResolverAjuste.tsx`**: idem — listar todas as notas anexadas.
-- Lista de solicitações (admin e usuário): nada muda na coluna "Gasto Real" — continua mostrando `valor_gasto_real` (que agora é a soma).
+`gpt-4o`: ~US$ 0,01–0,03 por nota fiscal lida.
 
-## Detecção de duplicidade
+## Ordem de implementação
 
-A checagem por `arquivo_hash` e por (`numero_nota` + `cnpj_emitente`) hoje compara contra `solicitacoes`. Estender para também comparar contra `solicitacao_notas` (pequeno ajuste em `useImportarNota.ts`/lógica de duplicata, se aplicável ao fluxo de baixa). Dentro da mesma baixa também bloquear duas notas com o mesmo hash.
-
-## Migração
-
-- Criar tabela `solicitacao_notas` + índices em `solicitacao_id` e `arquivo_hash`.
-- Habilitar RLS e políticas descritas acima.
-- **Não** migrar baixas antigas — a UI faz fallback para os campos legados quando `solicitacao_notas` está vazio para aquela solicitação.
-
-## Arquivos a alterar
-
-- novo: migração SQL para `solicitacao_notas`
-- `src/pages/user/Baixa.tsx` — refatorar para lista de notas + dialog de adicionar
-- `src/components/admin/ModalBaixaAdmin.tsx` — mesmo padrão
-- `src/pages/user/DetalhesSolicitacao.tsx` — listar notas
-- `src/pages/admin/Solicitacoes.tsx` — listar notas no modal de detalhes
-- `src/components/admin/ModalResolverAjuste.tsx` — listar notas
-- (opcional) extrair um componente reutilizável `NotasFiscaisManager` para evitar duplicação entre Baixa do usuário e ModalBaixaAdmin
+1. Migration `ai_config` + RLS
+2. Solicitar secret `OPENAI_API_KEY` (você cola a chave)
+3. Refatorar `leitor-notas` com lógica dual-provider
+4. Criar `set-openai-key`
+5. Aba "Inteligência Artificial" em `/admin/configuracoes`

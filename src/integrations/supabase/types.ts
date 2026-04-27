@@ -14,6 +14,33 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_config: {
+        Row: {
+          id: string
+          lovable_model: string
+          openai_model: string
+          provider: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          id?: string
+          lovable_model?: string
+          openai_model?: string
+          provider?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          id?: string
+          lovable_model?: string
+          openai_model?: string
+          provider?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       dominios_email_permitidos: {
         Row: {
           ativo: boolean
