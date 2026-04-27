@@ -53,7 +53,27 @@ export function ListaSolicitacoes({ defaultStatusFilter }: ListaSolicitacoesProp
       }
 
       const { data } = await query;
-      if (data) setSolicitacoes(data as Solicitacao[]);
+      if (data) {
+        // Buscar contagem de notas para detectar "baixa parcial" em status 'entregue'/'pendente_ajuste'
+        const idsParaContar = data
+          .filter((s: any) => s.status === 'entregue' || s.status === 'pendente_ajuste')
+          .map((s: any) => s.id);
+
+        let countMap = new Map<string, number>();
+        if (idsParaContar.length > 0) {
+          const { data: notas } = await supabase
+            .from('solicitacao_notas')
+            .select('solicitacao_id')
+            .in('solicitacao_id', idsParaContar);
+          notas?.forEach((n: any) => {
+            countMap.set(n.solicitacao_id, (countMap.get(n.solicitacao_id) || 0) + 1);
+          });
+        }
+
+        setSolicitacoes(
+          (data as Solicitacao[]).map(s => ({ ...s, notas_count: countMap.get(s.id) || 0 }))
+        );
+      }
       setLoading(false);
     };
 
