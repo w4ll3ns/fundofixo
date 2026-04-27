@@ -735,6 +735,13 @@ export default function AdminSolicitacoes() {
             )}
           </DialogContent>
         </Dialog>
+
+        <ModalResolverAjuste
+          open={ajusteDialogOpen}
+          onOpenChange={setAjusteDialogOpen}
+          solicitacao={selectedSolicitacao}
+          onSuccess={fetchData}
+        />
       </div>
     </AppLayout>
   );
