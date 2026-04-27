@@ -430,6 +430,7 @@ export default function AdminSolicitacoes() {
                     <th className="text-left py-3 px-4 text-sm font-medium">Razão Social (Nota)</th>
                     <th className="text-left py-3 px-4 text-sm font-medium">Solicitado</th>
                     <th className="text-left py-3 px-4 text-sm font-medium">Entregue</th>
+                    <th className="text-left py-3 px-4 text-sm font-medium">Gasto Real</th>
                     <th className="text-left py-3 px-4 text-sm font-medium">Data Nota</th>
                     <th className="text-left py-3 px-4 text-sm font-medium">Status</th>
                     <th className="text-left py-3 px-4 text-sm font-medium">Alertas</th>
