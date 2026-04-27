@@ -16,7 +16,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatCurrency, formatDate, maskCurrency, parseCurrency } from '@/lib/masks';
 import { LIMITE_MAXIMO_SOLICITACAO, TIPOS_SOLICITACAO_LABELS, TipoSolicitacao } from '@/lib/constants';
-import { Search, Check, X, Eye, AlertTriangle, Wallet, Scale } from 'lucide-react';
+import { Search, Check, X, Eye, AlertTriangle, Wallet, Scale, Undo2 } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { ModalResolverAjuste } from '@/components/admin/ModalResolverAjuste';
 import { NotasFiscaisList } from '@/components/baixa/NotasFiscaisList';
@@ -74,6 +74,9 @@ export default function AdminSolicitacoes() {
   const [motivoRejeicao, setMotivoRejeicao] = useState('');
   const [autorizarExcesso, setAutorizarExcesso] = useState(false);
   const [justificativaExcesso, setJustificativaExcesso] = useState('');
+  const [desfazerDialogOpen, setDesfazerDialogOpen] = useState(false);
+  const [motivoDesfazer, setMotivoDesfazer] = useState('');
+  const [desfazendo, setDesfazendo] = useState(false);
 
   const fetchData = async () => {
     let query = supabase
@@ -244,7 +247,79 @@ export default function AdminSolicitacoes() {
 
     toast({ title: 'Solicitação rejeitada' });
     setRejectDialogOpen(false);
-    fetchData();
+  };
+
+  const handleDesfazerBaixa = async () => {
+    if (!selectedSolicitacao) return;
+    if (!motivoDesfazer.trim()) {
+      toast({ title: 'Motivo obrigatório', description: 'Informe o motivo do desfazimento.', variant: 'destructive' });
+      return;
+    }
+    if (selectedSolicitacao.status !== 'baixada' && selectedSolicitacao.status !== 'pendente_ajuste') {
+      toast({ title: 'Operação não permitida', description: 'Só é possível desfazer baixas concluídas.', variant: 'destructive' });
+      return;
+    }
+
+    setDesfazendo(true);
+    try {
+      const troco = selectedSolicitacao.troco_real || 0;
+      const fundoId = getFundoId(selectedSolicitacao.empresa_id);
+
+      // 1. Estornar troco do fundo (se houver)
+      if (troco > 0 && fundoId) {
+        const { data: fundoData, error: fundoFetchError } = await supabase
+          .from('fundos').select('saldo_atual').eq('id', fundoId).single();
+        if (fundoFetchError) throw fundoFetchError;
+
+        const saldoAnterior = Number(fundoData.saldo_atual);
+        const saldoPosterior = saldoAnterior - troco;
+
+        const { error: updFundoError } = await supabase
+          .from('fundos').update({ saldo_atual: saldoPosterior }).eq('id', fundoId);
+        if (updFundoError) throw updFundoError;
+
+        await supabase.from('historico_fundos').insert({
+          fundo_id: fundoId,
+          tipo: 'ajuste',
+          valor: -troco,
+          descricao: `Desfazimento de baixa (estorno do troco): ${motivoDesfazer.substring(0, 200)}`,
+          admin_id: user?.id,
+          solicitacao_id: selectedSolicitacao.id,
+          saldo_anterior: saldoAnterior,
+          saldo_posterior: saldoPosterior,
+        });
+      }
+
+      // 2. Reverter solicitação para 'entregue'
+      const obsAppend = `[Baixa desfeita em ${new Date().toLocaleString('pt-BR')}: ${motivoDesfazer}]`;
+      const { error: updSolError } = await supabase.from('solicitacoes').update({
+        status: 'entregue',
+        data_baixa: null,
+        valor_gasto_real: null,
+        troco_real: null,
+        observacoes_admin: obsAppend,
+      }).eq('id', selectedSolicitacao.id);
+      if (updSolError) throw updSolError;
+
+      // 3. Notificar usuário
+      await supabase.from('notificacoes').insert({
+        user_id: selectedSolicitacao.solicitante_user_id,
+        titulo: 'Baixa revertida para correção',
+        mensagem: `Sua baixa foi revertida pelo administrador. Motivo: ${motivoDesfazer}. Acesse "Continuar Baixa" para corrigir.`,
+        tipo: 'warning',
+        link: `/baixa/${selectedSolicitacao.id}`,
+      });
+
+      toast({ title: 'Baixa desfeita', description: troco > 0 ? `Troco de ${formatCurrency(troco)} estornado do fundo.` : 'A solicitação voltou para "Baixa pendente".' });
+      setDesfazerDialogOpen(false);
+      setDetailDialogOpen(false);
+      setMotivoDesfazer('');
+      fetchData();
+    } catch (error: any) {
+      toast({ title: 'Erro ao desfazer baixa', description: error.message, variant: 'destructive' });
+    } finally {
+      setDesfazendo(false);
+    }
   };
 
   // Gerar lista de meses disponíveis baseado nas notas baixadas
@@ -774,6 +849,62 @@ export default function AdminSolicitacoes() {
                 </div>
               </DialogBody>
             )}
+            {selectedSolicitacao && (selectedSolicitacao.status === 'baixada' || selectedSolicitacao.status === 'pendente_ajuste') && (
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  className="text-destructive border-destructive hover:bg-destructive/10"
+                  onClick={() => { setMotivoDesfazer(''); setDesfazerDialogOpen(true); }}
+                >
+                  <Undo2 className="w-4 h-4 mr-2" />
+                  Desfazer baixa
+                </Button>
+              </DialogFooter>
+            )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Desfazer Baixa Dialog */}
+        <Dialog open={desfazerDialogOpen} onOpenChange={setDesfazerDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Desfazer baixa</DialogTitle>
+              <DialogDescription>
+                A solicitação voltará para "Baixa pendente" para o usuário corrigir.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogBody>
+              <div className="space-y-3">
+                <Alert>
+                  <AlertTriangle className="w-4 h-4" />
+                  <AlertDescription className="text-sm space-y-1">
+                    <p>• A solicitação voltará para o status <strong>"entregue"</strong>.</p>
+                    {selectedSolicitacao?.troco_real != null && selectedSolicitacao.troco_real > 0 && (
+                      <p>• O troco de <strong>{formatCurrency(selectedSolicitacao.troco_real)}</strong> será <strong>estornado do fundo</strong>.</p>
+                    )}
+                    <p>• As notas fiscais já anexadas <strong>permanecem</strong> como rascunho.</p>
+                    <p>• O usuário será notificado.</p>
+                  </AlertDescription>
+                </Alert>
+                <div className="space-y-2">
+                  <Label>Motivo do desfazimento *</Label>
+                  <Textarea
+                    value={motivoDesfazer}
+                    onChange={(e) => setMotivoDesfazer(e.target.value)}
+                    placeholder="Ex.: Nota fiscal incorreta, valor divergente..."
+                    rows={3}
+                  />
+                </div>
+              </div>
+            </DialogBody>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setDesfazerDialogOpen(false)} disabled={desfazendo}>
+                Cancelar
+              </Button>
+              <Button variant="destructive" onClick={handleDesfazerBaixa} disabled={desfazendo}>
+                {desfazendo ? 'Desfazendo...' : 'Confirmar desfazimento'}
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
 
