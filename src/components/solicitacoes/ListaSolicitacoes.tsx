@@ -22,6 +22,7 @@ interface Solicitacao {
   justificativa: string;
   data_emissao_nota: string | null;
   empresas: { nome_fantasia: string } | null;
+  notas_count?: number;
 }
 
 interface ListaSolicitacoesProps {
