@@ -273,6 +273,15 @@ export default function BaixasPendentes() {
                           <Download className="h-4 w-4 mr-2" />
                           Baixa
                         </Button>
+                        <Button 
+                          variant="outline"
+                          size="sm"
+                          className="h-10 px-3 text-destructive hover:text-destructive hover:bg-destructive/10"
+                          onClick={() => handleOpenDelete(sol)}
+                          aria-label="Excluir baixa"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </div>
                     </div>
                   );
