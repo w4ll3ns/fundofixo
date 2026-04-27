@@ -36,6 +36,10 @@ interface Solicitacao {
   ai_valor_extraido: number | null;
   ai_confianca: 'alta' | 'media' | 'baixa' | null;
   ai_status: 'pendente' | 'processado' | 'erro' | null;
+  tipo_ajuste: 'complemento_fundo' | 'reembolso_usuario' | null;
+  valor_ajuste: number | null;
+  data_ajuste: string | null;
+  observacao_ajuste: string | null;
   empresas: { nome_fantasia: string } | null;
   profiles: { nome: string } | null;
 }
@@ -58,6 +62,7 @@ export default function DetalhesSolicitacao() {
           motivo_rejeicao, observacoes_admin, forma_entrega, descricao_compra, 
           upload_nota_fiscal_url, data_emissao_nota, numero_nota, nome_emitente, cnpj_emitente,
           ai_valor_extraido, ai_confianca, ai_status,
+          tipo_ajuste, valor_ajuste, data_ajuste, observacao_ajuste,
           empresas(nome_fantasia), profiles:solicitante_user_id(nome)
         `)
         .eq('id', id)
@@ -94,7 +99,8 @@ export default function DetalhesSolicitacao() {
 
   // Check if current user is the owner (not consultivo viewing)
   const isOwner = user?.id === solicitacao.solicitante_user_id;
-  const canDoBaixa = isOwner && (solicitacao.status === 'entregue' || solicitacao.status === 'pendente_ajuste');
+  const ajusteResolvido = !!solicitacao.tipo_ajuste;
+  const canDoBaixa = isOwner && !ajusteResolvido && (solicitacao.status === 'entregue' || solicitacao.status === 'pendente_ajuste');
 
   return (
     <AppLayout>
@@ -147,6 +153,36 @@ export default function DetalhesSolicitacao() {
                 <p className={`text-xl font-bold ${solicitacao.troco_real >= 0 ? 'text-success' : 'text-warning'}`}>
                   {formatCurrency(Math.abs(solicitacao.troco_real))}
                 </p>
+              </div>
+            )}
+
+            {/* Ajuste resolvido pelo admin */}
+            {ajusteResolvido && (
+              <div className="p-4 rounded-lg bg-primary/5 border border-primary/20 space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-medium text-primary">Ajuste Resolvido pelo Admin</p>
+                  {solicitacao.data_ajuste && (
+                    <p className="text-xs text-muted-foreground">{formatDate(solicitacao.data_ajuste)}</p>
+                  )}
+                </div>
+                <p className="text-sm">
+                  <strong>
+                    {solicitacao.tipo_ajuste === 'complemento_fundo'
+                      ? 'Complemento do fundo fixo'
+                      : 'Reembolso ao usuário'}
+                  </strong>
+                  {solicitacao.valor_ajuste != null && (
+                    <span className="text-muted-foreground"> · {formatCurrency(solicitacao.valor_ajuste)}</span>
+                  )}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {solicitacao.tipo_ajuste === 'complemento_fundo'
+                    ? 'O excedente foi registrado como retirada adicional do fundo fixo da empresa.'
+                    : 'O usuário pagou com recursos próprios e será reembolsado pela empresa.'}
+                </p>
+                {solicitacao.observacao_ajuste && (
+                  <p className="text-sm p-2 rounded bg-background/60 mt-2">{solicitacao.observacao_ajuste}</p>
+                )}
               </div>
             )}
 

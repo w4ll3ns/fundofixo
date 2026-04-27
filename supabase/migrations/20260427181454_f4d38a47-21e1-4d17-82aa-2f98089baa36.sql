@@ -1,0 +1,6 @@
+ALTER TABLE public.solicitacoes
+  ADD COLUMN IF NOT EXISTS tipo_ajuste TEXT,
+  ADD COLUMN IF NOT EXISTS valor_ajuste NUMERIC,
+  ADD COLUMN IF NOT EXISTS data_ajuste TIMESTAMP WITH TIME ZONE,
+  ADD COLUMN IF NOT EXISTS admin_ajuste_id UUID,
+  ADD COLUMN IF NOT EXISTS observacao_ajuste TEXT;

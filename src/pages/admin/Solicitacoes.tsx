@@ -16,8 +16,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatCurrency, formatDate, maskCurrency, parseCurrency } from '@/lib/masks';
 import { LIMITE_MAXIMO_SOLICITACAO, TIPOS_SOLICITACAO_LABELS, TipoSolicitacao } from '@/lib/constants';
-import { Search, Check, X, Eye, AlertTriangle, Wallet } from 'lucide-react';
+import { Search, Check, X, Eye, AlertTriangle, Wallet, Scale } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { ModalResolverAjuste } from '@/components/admin/ModalResolverAjuste';
 
 type StatusType = 'enviada' | 'aprovada' | 'entregue' | 'rejeitada' | 'baixada' | 'pendente_ajuste';
 
@@ -40,6 +41,8 @@ interface Solicitacao {
   cnpj_emitente: string | null;
   upload_nota_fiscal_url: string | null;
   data_emissao_nota: string | null;
+  valor_gasto_real: number | null;
+  troco_real: number | null;
 }
 
 interface Fundo {
@@ -62,6 +65,7 @@ export default function AdminSolicitacoes() {
   const [approveDialogOpen, setApproveDialogOpen] = useState(false);
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
+  const [ajusteDialogOpen, setAjusteDialogOpen] = useState(false);
   const [selectedSolicitacao, setSelectedSolicitacao] = useState<Solicitacao | null>(null);
   const [valorEntregue, setValorEntregue] = useState('');
   const [formaEntrega, setFormaEntrega] = useState('dinheiro');
@@ -73,7 +77,7 @@ export default function AdminSolicitacoes() {
   const fetchData = async () => {
     let query = supabase
       .from('solicitacoes')
-      .select('id, valor_solicitado, valor_entregue, status, created_at, justificativa, categoria, tipo_solicitacao, excedeu_saldo, excedeu_limite_maximo, empresa_id, solicitante_user_id, nome_emitente, cnpj_emitente, upload_nota_fiscal_url, data_emissao_nota, empresas(nome_fantasia), profiles:solicitante_user_id(nome)')
+      .select('id, valor_solicitado, valor_entregue, status, created_at, justificativa, categoria, tipo_solicitacao, excedeu_saldo, excedeu_limite_maximo, empresa_id, solicitante_user_id, nome_emitente, cnpj_emitente, upload_nota_fiscal_url, data_emissao_nota, valor_gasto_real, troco_real, empresas(nome_fantasia), profiles:solicitante_user_id(nome)')
       .order('created_at', { ascending: false });
 
     if (statusFilter !== 'all') {
@@ -392,6 +396,17 @@ export default function AdminSolicitacoes() {
                         </Button>
                       </>
                     )}
+                    {sol.status === 'pendente_ajuste' && (
+                      <Button
+                        size="sm"
+                        variant="default"
+                        className="h-10 px-4"
+                        onClick={() => { setSelectedSolicitacao(sol); setAjusteDialogOpen(true); }}
+                      >
+                        <Scale className="h-4 w-4 mr-2" />
+                        Resolver
+                      </Button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -457,6 +472,17 @@ export default function AdminSolicitacoes() {
                                 <X className="h-4 w-4" />
                               </Button>
                             </>
+                          )}
+                          {sol.status === 'pendente_ajuste' && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="text-warning hover:text-warning"
+                              title="Resolver ajuste"
+                              onClick={() => { setSelectedSolicitacao(sol); setAjusteDialogOpen(true); }}
+                            >
+                              <Scale className="h-4 w-4" />
+                            </Button>
                           )}
                         </div>
                       </td>
@@ -709,6 +735,13 @@ export default function AdminSolicitacoes() {
             )}
           </DialogContent>
         </Dialog>
+
+        <ModalResolverAjuste
+          open={ajusteDialogOpen}
+          onOpenChange={setAjusteDialogOpen}
+          solicitacao={selectedSolicitacao}
+          onSuccess={fetchData}
+        />
       </div>
     </AppLayout>
   );
