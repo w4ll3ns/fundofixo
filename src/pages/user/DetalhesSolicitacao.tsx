@@ -50,9 +50,10 @@ interface Solicitacao {
 export default function DetalhesSolicitacao() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { user, hasConsultiveAccess } = useAuth();
+  const { user, isAdmin, hasConsultiveAccess } = useAuth();
   const [solicitacao, setSolicitacao] = useState<Solicitacao | null>(null);
   const [loading, setLoading] = useState(true);
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   useEffect(() => {
     const fetchSolicitacao = async () => {
