@@ -176,16 +176,29 @@ export function NotasFiscaisManager({ notas, onChange, storagePathPrefix, inputI
         body: { file_base64: base64, file_type: selected.type },
       });
 
-      if (aiErr || !aiData?.total_value) {
+      // Normaliza resposta: backend pode retornar { notas_encontradas, notas: [...] } ou formato antigo flat
+      const primeiraNota = aiData?.notas?.[0];
+      const ai: any = primeiraNota
+        ? {
+            total_value: primeiraNota.total_value,
+            confidence_label: primeiraNota.confidence_label,
+            evidence_text: primeiraNota.evidence_text,
+            extracted_fields: primeiraNota.extracted_fields || {},
+          }
+        : aiData?.total_value
+          ? aiData
+          : null;
+
+      if (aiErr || !ai?.total_value) {
         setAiError(true);
         toast({ title: 'IA não conseguiu ler a nota', description: 'Preencha os campos manualmente', variant: 'destructive' });
       } else {
-        setAiResult(aiData as AIResult);
-        setValorDisplay(maskCurrency(String(Math.round((aiData.total_value as number) * 100))));
-        if (aiData.extracted_fields?.data_emissao) setDataEmissao(aiData.extracted_fields.data_emissao);
-        if (aiData.extracted_fields?.numero_nota) setNumeroNota(aiData.extracted_fields.numero_nota);
-        if (aiData.extracted_fields?.nome_emitente) setNomeEmitente(aiData.extracted_fields.nome_emitente);
-        if (aiData.extracted_fields?.cnpj_emitente) setCnpjEmitente(maskCNPJ(aiData.extracted_fields.cnpj_emitente));
+        setAiResult(ai as AIResult);
+        setValorDisplay(maskCurrency(String(Math.round((ai.total_value as number) * 100))));
+        if (ai.extracted_fields?.data_emissao) setDataEmissao(ai.extracted_fields.data_emissao);
+        if (ai.extracted_fields?.numero_nota) setNumeroNota(ai.extracted_fields.numero_nota);
+        if (ai.extracted_fields?.nome_emitente) setNomeEmitente(ai.extracted_fields.nome_emitente);
+        if (ai.extracted_fields?.cnpj_emitente) setCnpjEmitente(maskCNPJ(ai.extracted_fields.cnpj_emitente));
         toast({ title: 'Nota processada!', description: 'Campos preenchidos automaticamente' });
       }
     } catch (err) {
