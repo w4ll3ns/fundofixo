@@ -273,7 +273,7 @@ export function NotasFiscaisManager({ notas, onChange, storagePathPrefix, inputI
                 <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEditDialog(n)}>
                   <Pencil className="h-4 w-4" />
                 </Button>
-                <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => handleRemove(n.id)}>
+                <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setNotaToRemove(n)}>
                   <Trash2 className="h-4 w-4" />
                 </Button>
               </div>
