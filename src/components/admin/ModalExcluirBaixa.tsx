@@ -84,7 +84,7 @@ export function ModalExcluirBaixa({ open, onOpenChange, solicitacao, onSuccess }
           const { error: histErr } = await supabase.from('historico_fundos').insert({
             fundo_id: fundo.id,
             solicitacao_id: solicitacao.id,
-            tipo: 'estorno',
+            tipo: 'ajuste',
             valor: valorEntregue,
             saldo_anterior: saldoAnterior,
             saldo_posterior: novoSaldo,
