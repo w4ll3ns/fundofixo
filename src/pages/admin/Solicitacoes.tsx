@@ -175,11 +175,10 @@ export default function AdminSolicitacoes() {
 
       if (updateError) throw updateError;
 
-      // If FUNDO_FIXO, update saldo and create history
-      if (isFundoFixo && fundoId) {
+      // Debita do fundo para qualquer tipo (FUNDO_FIXO ou COMPRA_AVULSA)
+      if (fundoId) {
         const novoSaldo = saldoAtual - valor;
 
-        // Update fundo saldo
         const { error: fundoError } = await supabase
           .from('fundos')
           .update({ saldo_atual: novoSaldo })
@@ -187,12 +186,12 @@ export default function AdminSolicitacoes() {
 
         if (fundoError) throw fundoError;
 
-        // Create history record
+        const descricaoTipo = isFundoFixo ? 'Entrega solicitação' : 'Adiantamento compra avulsa';
         await supabase.from('historico_fundos').insert({
           fundo_id: fundoId,
           tipo: 'saida',
           valor: valor,
-          descricao: `Entrega solicitação - ${selectedSolicitacao.justificativa.substring(0, 50)}...`,
+          descricao: `${descricaoTipo} - ${selectedSolicitacao.justificativa.substring(0, 50)}...`,
           admin_id: user?.id,
           solicitacao_id: selectedSolicitacao.id,
           saldo_anterior: saldoAtual,
