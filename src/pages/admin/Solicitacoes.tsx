@@ -19,6 +19,7 @@ import { LIMITE_MAXIMO_SOLICITACAO, TIPOS_SOLICITACAO_LABELS, TipoSolicitacao } 
 import { Search, Check, X, Eye, AlertTriangle, Wallet, Scale } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { ModalResolverAjuste } from '@/components/admin/ModalResolverAjuste';
+import { NotasFiscaisList } from '@/components/baixa/NotasFiscaisList';
 
 type StatusType = 'enviada' | 'aprovada' | 'entregue' | 'rejeitada' | 'baixada' | 'pendente_ajuste';
 
