@@ -590,6 +590,16 @@ export default function AdminSolicitacoes() {
                             >
                               <Scale className="h-4 w-4" />
                             </Button>
+                          {(sol.status === 'baixada' || sol.status === 'pendente_ajuste') && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="text-destructive hover:text-destructive"
+                              title="Desfazer baixa"
+                              onClick={() => openDesfazer(sol)}
+                            >
+                              <Undo2 className="h-4 w-4" />
+                            </Button>
                           )}
                         </div>
                       </td>
