@@ -105,6 +105,7 @@ export default function DetalhesSolicitacao() {
   const isOwner = user?.id === solicitacao.solicitante_user_id;
   const ajusteResolvido = !!solicitacao.tipo_ajuste;
   const canDoBaixa = isOwner && !ajusteResolvido && (solicitacao.status === 'entregue' || solicitacao.status === 'pendente_ajuste');
+  const canDeleteBaixa = isAdmin && (solicitacao.status === 'entregue' || solicitacao.status === 'pendente_ajuste');
 
   return (
     <AppLayout>
@@ -114,9 +115,22 @@ export default function DetalhesSolicitacao() {
           Voltar
         </Button>
 
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
           <h1 className="text-2xl font-bold">Detalhes da Solicitação</h1>
-          <StatusBadge status={solicitacao.status} />
+          <div className="flex items-center gap-2">
+            <StatusBadge status={solicitacao.status} />
+            {canDeleteBaixa && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                onClick={() => setDeleteOpen(true)}
+              >
+                <Trash2 className="h-4 w-4 mr-1" />
+                Excluir baixa
+              </Button>
+            )}
+          </div>
         </div>
 
         {/* Main Info Card */}
