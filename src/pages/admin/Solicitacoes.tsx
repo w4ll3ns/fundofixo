@@ -137,7 +137,8 @@ export default function AdminSolicitacoes() {
     const fundoId = getFundoId(selectedSolicitacao.empresa_id);
     const isFundoFixo = selectedSolicitacao.tipo_solicitacao === 'FUNDO_FIXO';
     const excedeValor = valor > LIMITE_MAXIMO_SOLICITACAO;
-    const excedeSaldo = isFundoFixo && valor > saldoAtual;
+    // Tanto FUNDO_FIXO quanto COMPRA_AVULSA saem do mesmo caixa físico do fundo
+    const excedeSaldo = valor > saldoAtual;
 
     // Check if authorization is needed
     if ((excedeValor || excedeSaldo) && !autorizarExcesso) {
@@ -174,11 +175,10 @@ export default function AdminSolicitacoes() {
 
       if (updateError) throw updateError;
 
-      // If FUNDO_FIXO, update saldo and create history
-      if (isFundoFixo && fundoId) {
+      // Debita do fundo para qualquer tipo (FUNDO_FIXO ou COMPRA_AVULSA)
+      if (fundoId) {
         const novoSaldo = saldoAtual - valor;
 
-        // Update fundo saldo
         const { error: fundoError } = await supabase
           .from('fundos')
           .update({ saldo_atual: novoSaldo })
@@ -186,12 +186,12 @@ export default function AdminSolicitacoes() {
 
         if (fundoError) throw fundoError;
 
-        // Create history record
+        const descricaoTipo = isFundoFixo ? 'Entrega solicitação' : 'Adiantamento compra avulsa';
         await supabase.from('historico_fundos').insert({
           fundo_id: fundoId,
           tipo: 'saida',
           valor: valor,
-          descricao: `Entrega solicitação - ${selectedSolicitacao.justificativa.substring(0, 50)}...`,
+          descricao: `${descricaoTipo} - ${selectedSolicitacao.justificativa.substring(0, 50)}...`,
           admin_id: user?.id,
           solicitacao_id: selectedSolicitacao.id,
           saldo_anterior: saldoAtual,
@@ -518,15 +518,13 @@ export default function AdminSolicitacoes() {
             {selectedSolicitacao && (
               <DialogBody>
                 <div className="space-y-4">
-                  {/* Info sobre saldo (apenas FUNDO_FIXO) */}
-                  {selectedSolicitacao.tipo_solicitacao === 'FUNDO_FIXO' && (
-                    <Alert>
-                      <Wallet className="h-4 w-4" />
-                      <AlertDescription>
-                        Saldo disponível da empresa: <strong>{formatCurrency(getSaldoEmpresa(selectedSolicitacao.empresa_id))}</strong>
-                      </AlertDescription>
-                    </Alert>
-                  )}
+                  {/* Info sobre saldo do fundo */}
+                  <Alert>
+                    <Wallet className="h-4 w-4" />
+                    <AlertDescription>
+                      Saldo disponível da empresa: <strong>{formatCurrency(getSaldoEmpresa(selectedSolicitacao.empresa_id))}</strong>
+                    </AlertDescription>
+                  </Alert>
 
                   <div className="space-y-2">
                     <Label>Valor Entregue *</Label>
@@ -544,8 +542,7 @@ export default function AdminSolicitacoes() {
                         Excede limite máximo de {formatCurrency(LIMITE_MAXIMO_SOLICITACAO)}
                       </p>
                     )}
-                    {selectedSolicitacao.tipo_solicitacao === 'FUNDO_FIXO' && 
-                     parseCurrency(valorEntregue) > getSaldoEmpresa(selectedSolicitacao.empresa_id) && (
+                    {parseCurrency(valorEntregue) > getSaldoEmpresa(selectedSolicitacao.empresa_id) && (
                       <p className="text-sm text-warning flex items-center gap-1">
                         <Wallet className="h-4 w-4" />
                         Excede saldo disponível do fundo
@@ -574,8 +571,7 @@ export default function AdminSolicitacoes() {
 
                   {/* Autorização de excesso */}
                   {(parseCurrency(valorEntregue) > LIMITE_MAXIMO_SOLICITACAO || 
-                    (selectedSolicitacao.tipo_solicitacao === 'FUNDO_FIXO' && 
-                     parseCurrency(valorEntregue) > getSaldoEmpresa(selectedSolicitacao.empresa_id))) && (
+                    parseCurrency(valorEntregue) > getSaldoEmpresa(selectedSolicitacao.empresa_id)) && (
                     <div className="space-y-4 p-4 rounded-lg border border-warning bg-warning/5">
                       <div className="flex items-center space-x-2">
                         <Checkbox 
