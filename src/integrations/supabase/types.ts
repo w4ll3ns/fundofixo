@@ -250,6 +250,74 @@ export type Database = {
         }
         Relationships: []
       }
+      solicitacao_notas: {
+        Row: {
+          ai_confianca: Database["public"]["Enums"]["nivel_confianca"] | null
+          ai_evidencia: string | null
+          ai_processed_at: string | null
+          ai_status: Database["public"]["Enums"]["ai_status"] | null
+          ai_valor_extraido: number | null
+          arquivo_hash: string | null
+          cnpj_emitente: string | null
+          created_at: string
+          created_by: string | null
+          data_emissao: string | null
+          descricao: string | null
+          id: string
+          nome_emitente: string | null
+          numero_nota: string | null
+          solicitacao_id: string
+          upload_url: string
+          valor: number
+        }
+        Insert: {
+          ai_confianca?: Database["public"]["Enums"]["nivel_confianca"] | null
+          ai_evidencia?: string | null
+          ai_processed_at?: string | null
+          ai_status?: Database["public"]["Enums"]["ai_status"] | null
+          ai_valor_extraido?: number | null
+          arquivo_hash?: string | null
+          cnpj_emitente?: string | null
+          created_at?: string
+          created_by?: string | null
+          data_emissao?: string | null
+          descricao?: string | null
+          id?: string
+          nome_emitente?: string | null
+          numero_nota?: string | null
+          solicitacao_id: string
+          upload_url: string
+          valor: number
+        }
+        Update: {
+          ai_confianca?: Database["public"]["Enums"]["nivel_confianca"] | null
+          ai_evidencia?: string | null
+          ai_processed_at?: string | null
+          ai_status?: Database["public"]["Enums"]["ai_status"] | null
+          ai_valor_extraido?: number | null
+          arquivo_hash?: string | null
+          cnpj_emitente?: string | null
+          created_at?: string
+          created_by?: string | null
+          data_emissao?: string | null
+          descricao?: string | null
+          id?: string
+          nome_emitente?: string | null
+          numero_nota?: string | null
+          solicitacao_id?: string
+          upload_url?: string
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "solicitacao_notas_solicitacao_id_fkey"
+            columns: ["solicitacao_id"]
+            isOneToOne: false
+            referencedRelation: "solicitacoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       solicitacoes: {
         Row: {
           admin_ajuste_id: string | null

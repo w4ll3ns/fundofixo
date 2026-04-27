@@ -19,6 +19,7 @@ import { LIMITE_MAXIMO_SOLICITACAO, TIPOS_SOLICITACAO_LABELS, TipoSolicitacao } 
 import { Search, Check, X, Eye, AlertTriangle, Wallet, Scale } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { ModalResolverAjuste } from '@/components/admin/ModalResolverAjuste';
+import { NotasFiscaisList } from '@/components/baixa/NotasFiscaisList';
 
 type StatusType = 'enviada' | 'aprovada' | 'entregue' | 'rejeitada' | 'baixada' | 'pendente_ajuste';
 
@@ -747,15 +748,27 @@ export default function AdminSolicitacoes() {
                             </p>
                           </div>
                         )}
-                        {selectedSolicitacao.upload_nota_fiscal_url && (
-                          <div>
-                            <p className="text-sm text-muted-foreground">Nota Fiscal</p>
-                            <Badge variant="outline" className="text-success border-success">
-                              Anexada
-                            </Badge>
-                          </div>
-                        )}
                       </div>
+                    </div>
+                  )}
+
+                  {/* Notas Fiscais Anexadas */}
+                  {(selectedSolicitacao.status === 'baixada' || selectedSolicitacao.status === 'pendente_ajuste' || selectedSolicitacao.upload_nota_fiscal_url) && (
+                    <div className="pt-4 border-t border-border">
+                      <p className="text-sm font-medium mb-3">Notas Fiscais</p>
+                      <NotasFiscaisList
+                        solicitacaoId={selectedSolicitacao.id}
+                        legacy={{
+                          upload_nota_fiscal_url: selectedSolicitacao.upload_nota_fiscal_url,
+                          numero_nota: (selectedSolicitacao as any).numero_nota,
+                          nome_emitente: selectedSolicitacao.nome_emitente,
+                          cnpj_emitente: selectedSolicitacao.cnpj_emitente,
+                          data_emissao_nota: selectedSolicitacao.data_emissao_nota,
+                          ai_valor_extraido: (selectedSolicitacao as any).ai_valor_extraido,
+                          ai_confianca: (selectedSolicitacao as any).ai_confianca,
+                          valor_gasto_real: selectedSolicitacao.valor_gasto_real,
+                        }}
+                      />
                     </div>
                   )}
                 </div>
