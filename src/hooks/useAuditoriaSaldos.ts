@@ -33,15 +33,30 @@ export function useAuditoriaSaldos() {
 
     await Promise.all(
       fundos.map(async (f: any) => {
-        const { data: ultimo } = await supabase
+        // Soma todos os lançamentos do histórico aplicando o sinal correto por tipo.
+        // Mais robusto que confiar no saldo_posterior do "último" lançamento (que pode falhar
+        // quando vários inserts compartilham o mesmo created_at).
+        const { data: lancamentos } = await supabase
           .from('historico_fundos')
-          .select('saldo_posterior, created_at')
+          .select('tipo, valor, created_at')
           .eq('fundo_id', f.id)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
+          .order('created_at', { ascending: false });
 
-        const saldoEsperado = ultimo ? Number(ultimo.saldo_posterior) : 0;
+        const TIPOS_CREDITO = new Set(['entrada', 'adicao', 'devolucao_troco']);
+        const TIPOS_DEBITO = new Set(['saida', 'retirada']);
+        // 'ajuste' e 'solicitacao_retroativa' já vêm com sinal embutido no valor
+
+        let saldoEsperado = 0;
+        let ultimoCreatedAt: string | null = null;
+        for (const l of lancamentos ?? []) {
+          const v = Number(l.valor);
+          if (TIPOS_CREDITO.has(l.tipo)) saldoEsperado += v;
+          else if (TIPOS_DEBITO.has(l.tipo)) saldoEsperado -= v;
+          else saldoEsperado += v; // ajuste e outros já com sinal
+          if (!ultimoCreatedAt) ultimoCreatedAt = l.created_at;
+        }
+        saldoEsperado = Number(saldoEsperado.toFixed(2));
+
         const saldoAtual = Number(f.saldo_atual);
         const diferenca = Number((saldoEsperado - saldoAtual).toFixed(2));
 
@@ -56,7 +71,7 @@ export function useAuditoriaSaldos() {
             saldo_atual: saldoAtual,
             saldo_esperado: saldoEsperado,
             diferenca,
-            ultima_movimentacao_em: ultimo?.created_at ?? null,
+            ultima_movimentacao_em: ultimoCreatedAt,
           });
         }
       })
