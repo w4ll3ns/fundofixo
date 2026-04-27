@@ -1,42 +1,36 @@
-## Objetivo
+## Verificação prévia (PARTE 1)
 
-Fechar `leitor-notas` e `consultar-cnpj` (hoje públicas) e restringir CORS nas três edge functions, sem mexer no front-end.
+Executei a query de duplicatas de CNPJ em `public.empresas`:
 
-## Mudanças
+```
+SELECT cnpj, COUNT(*) FROM public.empresas GROUP BY cnpj HAVING COUNT(*) > 1;
+→ 0 linhas
+```
 
-### 1. `supabase/config.toml`
-Trocar `verify_jwt = false` → `true` em `[functions.leitor-notas]` e `[functions.consultar-cnpj]`.
+**Sem duplicatas.** Posso aplicar a migration completa com segurança, incluindo o `UNIQUE` em `empresas.cnpj`.
 
-### 2. `supabase/functions/leitor-notas/index.ts`
-- Remover o `const corsHeaders` do topo (linhas 4-7).
-- No início do handler `serve(async (req) => { ... })`, antes do `if (req.method === 'OPTIONS')`:
-  - Construir `corsHeaders` dinamicamente com whitelist `['https://fundofixo.lovable.app', 'http://localhost:8080']`, fallback para o primeiro, header `Vary: Origin`.
-- Logo após o tratamento de `OPTIONS` e antes do `try { ... }` principal: validar `Authorization: Bearer ...` e `userClient.auth.getUser()`. Retornar 401 se ausente/ inválido.
-- Manter intacto o cliente `service_role` que lê `ai_config` (uso correto para bypass de RLS).
+Verificação adicional: `fundos.empresa_id` já tem constraint `UNIQUE` (`fundos_empresa_id_key`), então o `ON CONFLICT (empresa_id) DO NOTHING` no trigger e no back-fill funciona corretamente.
 
-### 3. `supabase/functions/consultar-cnpj/index.ts`
-- Mesma transformação: remover `corsHeaders` do topo, recriar dinamicamente no handler com whitelist + `Vary`.
-- Mesmo bloco de validação de auth (após OPTIONS, antes do `try`). Adicionar `import { createClient }` já existe.
+> Nota: existe uma memória do projeto que diz "CNPJ is NOT unique/PK. Multiple branches can share CNPJ". Adicionar `UNIQUE(cnpj)` agora **muda essa regra de negócio** — passará a ser proibido cadastrar duas filiais com o mesmo CNPJ. Como você pediu explicitamente o constraint e o banco hoje não tem duplicatas, vou aplicar e atualizar a memória após a execução. Se quiser manter a regra antiga, me avise antes de aprovar.
 
-### 4. `supabase/functions/check-openai-key/index.ts`
-- Apenas trocar o `corsHeaders` estático por construção dinâmica no topo do handler (mesma whitelist + `Vary`). Validação de auth e role admin já existem — não tocar.
+## Migration (PARTE 2)
 
-## Detalhes técnicos
+Criar **uma única** migration `hardening_rls_constraints_e_trigger_fundo` com os 6 blocos exatamente como você especificou:
 
-- `verify_jwt = true` faz a plataforma rejeitar requests sem JWT antes de chegar no código; a validação extra dentro da function é redundância defensiva e dá acesso ao `user.id` se precisar depois.
-- CORS dinâmico devolve o origin exato quando está na whitelist; navegadores fora da whitelist recebem o origin canônico (`fundofixo.lovable.app`) e o browser bloqueia. Não é proteção real (curl ignora CORS) — a proteção real é o JWT —, mas reduz uso indevido a partir de outros sites.
-- `localhost:8080` na whitelist é só pra desenvolvimento local fora do Lovable; pode ser removido depois se quiser.
-- `supabase.functions.invoke()` no front já injeta o JWT do usuário logado: nenhum ajuste em `src/**` necessário.
+1. **RLS `notificacoes`** — drop `"System can insert notifications"`, criar `"Only admin or self can insert notifications"` com `WITH CHECK (user_id = auth.uid() OR has_role(auth.uid(), 'admin'))`.
+2. **RLS UPDATE `solicitacoes`** — drop e recriar `"Users can update own solicitacoes when allowed"` adicionando `WITH CHECK (solicitante_user_id = auth.uid())`.
+3. **`ALTER TABLE empresas ADD CONSTRAINT empresas_cnpj_unique UNIQUE (cnpj)`**.
+4. **`ALTER TABLE solicitacoes ADD CONSTRAINT chk_valor_solicitado_positivo CHECK (valor_solicitado > 0)`**.
+5. **Trigger `trg_empresa_criar_fundo`** + função `criar_fundo_empresa()` (`SECURITY DEFINER`, `search_path = public`) que insere em `fundos` no `AFTER INSERT` em `empresas`, com `ON CONFLICT (empresa_id) DO NOTHING`.
+6. **Back-fill** — `INSERT INTO fundos` para toda empresa sem fundo correspondente.
 
-## Critério de aceitação
+## Fora de escopo (não vou fazer)
 
-- `config.toml` com `verify_jwt = true` nas duas functions.
-- `leitor-notas` e `consultar-cnpj` retornam 401 sem JWT.
-- Importar nota e consultar CNPJ pelo app continuam funcionando para usuário logado.
-- `check-openai-key` continua funcionando para admin.
+- Nenhuma alteração em código TypeScript/React.
+- Nenhuma outra policy mexida.
+- Nenhuma RPC criada (fica pra Etapa 4).
 
-## Não será feito
+## Pós-migration
 
-- Nenhuma mudança em `src/**`.
-- Lógica interna das functions intacta.
-- `check-openai-key` mantém auth+role atuais.
+- Atualizar a memória `mem://data-model/company-cnpj-constraint` para refletir que CNPJ agora é UNIQUE.
+- Confirmar via `supabase--read_query` que: a policy antiga sumiu, a nova existe, o constraint UNIQUE existe, o CHECK existe, o trigger existe, e que `count(empresas) == count(fundos)` após o back-fill.
