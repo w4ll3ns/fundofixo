@@ -16,8 +16,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatCurrency, formatDate, maskCurrency, parseCurrency } from '@/lib/masks';
 import { LIMITE_MAXIMO_SOLICITACAO, TIPOS_SOLICITACAO_LABELS, TipoSolicitacao } from '@/lib/constants';
-import { Search, Check, X, Eye, AlertTriangle, Wallet } from 'lucide-react';
+import { Search, Check, X, Eye, AlertTriangle, Wallet, Scale } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { ModalResolverAjuste } from '@/components/admin/ModalResolverAjuste';
 
 type StatusType = 'enviada' | 'aprovada' | 'entregue' | 'rejeitada' | 'baixada' | 'pendente_ajuste';
 
