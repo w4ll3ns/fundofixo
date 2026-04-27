@@ -127,11 +127,14 @@ async function callOpenAI(model: string, userContent: any, isPDF: boolean, base6
     }
 
     const data = await response.json();
-    // Responses API: output[0].content[0].text
+    // Responses API: try multiple extraction paths
     const text = data.output_text
       ?? data.output?.[0]?.content?.[0]?.text
       ?? data.output?.find((o: any) => o.type === 'message')?.content?.find((c: any) => c.type === 'output_text')?.text
       ?? '';
+    if (!text) {
+      console.error('OpenAI Responses returned empty text. Raw data:', JSON.stringify(data).slice(0, 1500));
+    }
     return text;
   }
 
