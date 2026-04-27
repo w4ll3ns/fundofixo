@@ -851,6 +851,62 @@ export default function AdminSolicitacoes() {
                 </div>
               </DialogBody>
             )}
+            {selectedSolicitacao && (selectedSolicitacao.status === 'baixada' || selectedSolicitacao.status === 'pendente_ajuste') && (
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  className="text-destructive border-destructive hover:bg-destructive/10"
+                  onClick={() => { setMotivoDesfazer(''); setDesfazerDialogOpen(true); }}
+                >
+                  <Undo2 className="w-4 h-4 mr-2" />
+                  Desfazer baixa
+                </Button>
+              </DialogFooter>
+            )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Desfazer Baixa Dialog */}
+        <Dialog open={desfazerDialogOpen} onOpenChange={setDesfazerDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Desfazer baixa</DialogTitle>
+              <DialogDescription>
+                A solicitação voltará para "Baixa pendente" para o usuário corrigir.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogBody>
+              <div className="space-y-3">
+                <Alert>
+                  <AlertTriangle className="w-4 h-4" />
+                  <AlertDescription className="text-sm space-y-1">
+                    <p>• A solicitação voltará para o status <strong>"entregue"</strong>.</p>
+                    {selectedSolicitacao?.troco_real != null && selectedSolicitacao.troco_real > 0 && (
+                      <p>• O troco de <strong>{formatCurrency(selectedSolicitacao.troco_real)}</strong> será <strong>estornado do fundo</strong>.</p>
+                    )}
+                    <p>• As notas fiscais já anexadas <strong>permanecem</strong> como rascunho.</p>
+                    <p>• O usuário será notificado.</p>
+                  </AlertDescription>
+                </Alert>
+                <div className="space-y-2">
+                  <Label>Motivo do desfazimento *</Label>
+                  <Textarea
+                    value={motivoDesfazer}
+                    onChange={(e) => setMotivoDesfazer(e.target.value)}
+                    placeholder="Ex.: Nota fiscal incorreta, valor divergente..."
+                    rows={3}
+                  />
+                </div>
+              </div>
+            </DialogBody>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setDesfazerDialogOpen(false)} disabled={desfazendo}>
+                Cancelar
+              </Button>
+              <Button variant="destructive" onClick={handleDesfazerBaixa} disabled={desfazendo}>
+                {desfazendo ? 'Desfazendo...' : 'Confirmar desfazimento'}
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
 
