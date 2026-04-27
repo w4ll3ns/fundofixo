@@ -430,6 +430,7 @@ export default function AdminSolicitacoes() {
                     <th className="text-left py-3 px-4 text-sm font-medium">Razão Social (Nota)</th>
                     <th className="text-left py-3 px-4 text-sm font-medium">Solicitado</th>
                     <th className="text-left py-3 px-4 text-sm font-medium">Entregue</th>
+                    <th className="text-left py-3 px-4 text-sm font-medium">Gasto Real</th>
                     <th className="text-left py-3 px-4 text-sm font-medium">Data Nota</th>
                     <th className="text-left py-3 px-4 text-sm font-medium">Status</th>
                     <th className="text-left py-3 px-4 text-sm font-medium">Alertas</th>
@@ -452,6 +453,9 @@ export default function AdminSolicitacoes() {
                       </td>
                       <td className="py-3 px-4 text-sm font-medium">{formatCurrency(sol.valor_solicitado)}</td>
                       <td className="py-3 px-4 text-sm">{sol.valor_entregue ? formatCurrency(sol.valor_entregue) : '-'}</td>
+                      <td className={`py-3 px-4 text-sm ${sol.valor_gasto_real != null && sol.valor_entregue != null && sol.valor_gasto_real > sol.valor_entregue ? 'text-destructive font-medium' : ''}`}>
+                        {sol.valor_gasto_real != null ? formatCurrency(sol.valor_gasto_real) : '-'}
+                      </td>
                       <td className="py-3 px-4 text-sm">{sol.data_emissao_nota ? formatDate(sol.data_emissao_nota) : '-'}</td>
                       <td className="py-3 px-4"><StatusBadge status={sol.status} /></td>
                       <td className="py-3 px-4">
