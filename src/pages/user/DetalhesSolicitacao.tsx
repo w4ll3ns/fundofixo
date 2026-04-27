@@ -8,12 +8,15 @@ import { NotaFiscalPreview } from '@/components/solicitacoes/NotaFiscalPreview';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatCurrency, formatDate } from '@/lib/masks';
-import { ArrowLeft, Loader2, FileText, Building2, Calendar, DollarSign, Receipt, Bot } from 'lucide-react';
+import { ArrowLeft, Loader2, FileText, Building2, Calendar, DollarSign, Receipt, Bot, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { ModalExcluirBaixa } from '@/components/admin/ModalExcluirBaixa';
 
 interface Solicitacao {
   id: string;
+  empresa_id: string;
   solicitante_user_id: string;
+  tipo_solicitacao: 'FUNDO_FIXO' | 'COMPRA_AVULSA';
   valor_solicitado: number;
   valor_entregue: number | null;
   valor_gasto_real: number | null;
@@ -47,9 +50,10 @@ interface Solicitacao {
 export default function DetalhesSolicitacao() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { user, hasConsultiveAccess } = useAuth();
+  const { user, isAdmin, hasConsultiveAccess } = useAuth();
   const [solicitacao, setSolicitacao] = useState<Solicitacao | null>(null);
   const [loading, setLoading] = useState(true);
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   useEffect(() => {
     const fetchSolicitacao = async () => {
@@ -57,7 +61,7 @@ export default function DetalhesSolicitacao() {
       const { data } = await supabase
         .from('solicitacoes')
         .select(`
-          id, solicitante_user_id, valor_solicitado, valor_entregue, valor_gasto_real, troco_real, status, 
+          id, solicitante_user_id, empresa_id, tipo_solicitacao, valor_solicitado, valor_entregue, valor_gasto_real, troco_real, status, 
           created_at, data_aprovacao, data_baixa, justificativa, categoria, 
           motivo_rejeicao, observacoes_admin, forma_entrega, descricao_compra, 
           upload_nota_fiscal_url, data_emissao_nota, numero_nota, nome_emitente, cnpj_emitente,
@@ -101,6 +105,7 @@ export default function DetalhesSolicitacao() {
   const isOwner = user?.id === solicitacao.solicitante_user_id;
   const ajusteResolvido = !!solicitacao.tipo_ajuste;
   const canDoBaixa = isOwner && !ajusteResolvido && (solicitacao.status === 'entregue' || solicitacao.status === 'pendente_ajuste');
+  const canDeleteBaixa = isAdmin && (solicitacao.status === 'entregue' || solicitacao.status === 'pendente_ajuste');
 
   return (
     <AppLayout>
@@ -110,9 +115,22 @@ export default function DetalhesSolicitacao() {
           Voltar
         </Button>
 
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
           <h1 className="text-2xl font-bold">Detalhes da Solicitação</h1>
-          <StatusBadge status={solicitacao.status} />
+          <div className="flex items-center gap-2">
+            <StatusBadge status={solicitacao.status} />
+            {canDeleteBaixa && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                onClick={() => setDeleteOpen(true)}
+              >
+                <Trash2 className="h-4 w-4 mr-1" />
+                Excluir baixa
+              </Button>
+            )}
+          </div>
         </div>
 
         {/* Main Info Card */}
@@ -331,6 +349,13 @@ export default function DetalhesSolicitacao() {
           </CardContent>
         </Card>
       </div>
+
+      <ModalExcluirBaixa
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        solicitacao={solicitacao as any}
+        onSuccess={() => navigate('/admin/baixas-pendentes')}
+      />
     </AppLayout>
   );
 }

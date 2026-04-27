@@ -8,9 +8,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { StatusBadge } from '@/components/ui/status-badge';
 import { supabase } from '@/integrations/supabase/client';
 import { formatCurrency, formatDate } from '@/lib/masks';
-import { ArrowUpDown, Search, FileText, Eye, Download, AlertTriangle } from 'lucide-react';
+import { ArrowUpDown, Search, FileText, Eye, Download, AlertTriangle, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ModalBaixaAdmin } from '@/components/admin/ModalBaixaAdmin';
+import { ModalExcluirBaixa } from '@/components/admin/ModalExcluirBaixa';
 import { useIsMobile } from '@/hooks/use-mobile';
 
 interface Solicitacao {
@@ -21,6 +22,9 @@ interface Solicitacao {
   data_aprovacao: string;
   created_at: string;
   empresa_id: string;
+  solicitante_user_id: string;
+  tipo_solicitacao: 'FUNDO_FIXO' | 'COMPRA_AVULSA';
+  upload_nota_fiscal_url: string | null;
   empresas: { nome_fantasia: string } | null;
   profiles: { nome: string } | null;
   justificativa: string;
@@ -52,13 +56,15 @@ export default function BaixasPendentes() {
   // Modal
   const [selectedSolicitacao, setSelectedSolicitacao] = useState<Solicitacao | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [selectedToDelete, setSelectedToDelete] = useState<Solicitacao | null>(null);
 
   const fetchData = async () => {
     setLoading(true);
     const [solRes, empRes] = await Promise.all([
       supabase
         .from('solicitacoes')
-        .select('id, valor_solicitado, valor_entregue, status, data_aprovacao, created_at, empresa_id, justificativa, empresas(nome_fantasia), profiles:solicitante_user_id(nome)')
+        .select('id, valor_solicitado, valor_entregue, status, data_aprovacao, created_at, empresa_id, solicitante_user_id, tipo_solicitacao, upload_nota_fiscal_url, justificativa, empresas(nome_fantasia), profiles:solicitante_user_id(nome)')
         .eq('status', 'entregue')
         .order('data_aprovacao', { ascending: false }),
       supabase.from('empresas').select('id, nome_fantasia').eq('status', true),
@@ -127,6 +133,17 @@ export default function BaixasPendentes() {
   const handleBaixaSuccess = () => {
     setModalOpen(false);
     setSelectedSolicitacao(null);
+    fetchData();
+  };
+
+  const handleOpenDelete = (sol: Solicitacao) => {
+    setSelectedToDelete(sol);
+    setDeleteModalOpen(true);
+  };
+
+  const handleDeleteSuccess = () => {
+    setDeleteModalOpen(false);
+    setSelectedToDelete(null);
     fetchData();
   };
 
@@ -256,6 +273,15 @@ export default function BaixasPendentes() {
                           <Download className="h-4 w-4 mr-2" />
                           Baixa
                         </Button>
+                        <Button 
+                          variant="outline"
+                          size="sm"
+                          className="h-10 px-3 text-destructive hover:text-destructive hover:bg-destructive/10"
+                          onClick={() => handleOpenDelete(sol)}
+                          aria-label="Excluir baixa"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </div>
                     </div>
                   );
@@ -315,6 +341,15 @@ export default function BaixasPendentes() {
                                 <Download className="h-4 w-4 mr-1" />
                                 Baixa
                               </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                onClick={() => handleOpenDelete(sol)}
+                                aria-label="Excluir baixa"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
                             </div>
                           </td>
                         </tr>
@@ -335,6 +370,15 @@ export default function BaixasPendentes() {
         solicitacao={selectedSolicitacao}
         onSuccess={handleBaixaSuccess}
       />
+
+      {/* Modal de Exclusão */}
+      <ModalExcluirBaixa
+        open={deleteModalOpen}
+        onOpenChange={setDeleteModalOpen}
+        solicitacao={selectedToDelete}
+        onSuccess={handleDeleteSuccess}
+      />
     </AppLayout>
   );
 }
+
