@@ -447,6 +447,9 @@ export default function AdminSolicitacoes() {
                       </td>
                       <td className="py-3 px-4 text-sm">{sol.profiles?.nome || '-'}</td>
                       <td className="py-3 px-4 text-sm">{sol.empresas?.nome_fantasia || '-'}</td>
+                      <td className="py-3 px-4 text-sm max-w-[200px] truncate" title={sol.nome_emitente || ''}>
+                        {sol.nome_emitente || '-'}
+                      </td>
                       <td className="py-3 px-4 text-sm font-medium">{formatCurrency(sol.valor_solicitado)}</td>
                       <td className="py-3 px-4 text-sm">{sol.valor_entregue ? formatCurrency(sol.valor_entregue) : '-'}</td>
                       <td className="py-3 px-4 text-sm">{sol.data_emissao_nota ? formatDate(sol.data_emissao_nota) : '-'}</td>
