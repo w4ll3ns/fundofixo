@@ -674,6 +674,24 @@ export default function AdminSolicitacoes() {
                       <p className="text-sm text-muted-foreground">Valor Entregue</p>
                       <p className="font-medium">{selectedSolicitacao.valor_entregue ? formatCurrency(selectedSolicitacao.valor_entregue) : '-'}</p>
                     </div>
+                    {selectedSolicitacao.valor_gasto_real != null && (
+                      <div>
+                        <p className="text-sm text-muted-foreground">Valor Gasto Real</p>
+                        <p className="font-medium">{formatCurrency(selectedSolicitacao.valor_gasto_real)}</p>
+                      </div>
+                    )}
+                    {selectedSolicitacao.troco_real != null && selectedSolicitacao.troco_real > 0 && (
+                      <div>
+                        <p className="text-sm text-muted-foreground">Troco Devolvido ao Fundo</p>
+                        <p className="font-medium text-success">{formatCurrency(selectedSolicitacao.troco_real)}</p>
+                      </div>
+                    )}
+                    {selectedSolicitacao.valor_entregue != null && selectedSolicitacao.valor_gasto_real != null && selectedSolicitacao.valor_gasto_real > selectedSolicitacao.valor_entregue && (
+                      <div>
+                        <p className="text-sm text-muted-foreground">Diferença (Excesso)</p>
+                        <p className="font-medium text-destructive">{formatCurrency(selectedSolicitacao.valor_gasto_real - selectedSolicitacao.valor_entregue)}</p>
+                      </div>
+                    )}
                     {selectedSolicitacao.data_emissao_nota && (
                       <div>
                         <p className="text-sm text-muted-foreground">Data Emissão Nota</p>
