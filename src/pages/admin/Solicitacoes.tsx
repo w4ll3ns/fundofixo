@@ -396,6 +396,17 @@ export default function AdminSolicitacoes() {
                         </Button>
                       </>
                     )}
+                    {sol.status === 'pendente_ajuste' && (
+                      <Button
+                        size="sm"
+                        variant="default"
+                        className="h-10 px-4"
+                        onClick={() => { setSelectedSolicitacao(sol); setAjusteDialogOpen(true); }}
+                      >
+                        <Scale className="h-4 w-4 mr-2" />
+                        Resolver
+                      </Button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -461,6 +472,17 @@ export default function AdminSolicitacoes() {
                                 <X className="h-4 w-4" />
                               </Button>
                             </>
+                          )}
+                          {sol.status === 'pendente_ajuste' && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="text-warning hover:text-warning"
+                              title="Resolver ajuste"
+                              onClick={() => { setSelectedSolicitacao(sol); setAjusteDialogOpen(true); }}
+                            >
+                              <Scale className="h-4 w-4" />
+                            </Button>
                           )}
                         </div>
                       </td>
