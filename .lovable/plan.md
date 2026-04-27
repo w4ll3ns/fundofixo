@@ -1,15 +1,14 @@
-## Adicionar botão "Desfazer baixa" diretamente na tabela de solicitações
+## Confirmação antes de excluir nota fiscal anexada
 
 ### Mudança única
-**`src/pages/admin/Solicitacoes.tsx`** — adicionar botão `Undo2` na coluna de ações em ambas as visualizações:
+**`src/components/baixa/NotasFiscaisManager.tsx`**:
 
-1. **Helper** `openDesfazer(sol)` — define a solicitação selecionada, limpa o motivo e abre o `desfazerDialogOpen` já existente.
-2. **Desktop (tabela, ~linha 577)** — botão ghost com ícone `Undo2` em vermelho (`text-destructive`), tooltip "Desfazer baixa", visível quando `status ∈ {baixada, pendente_ajuste}`.
-3. **Mobile (cards, ~linha 491)** — botão `outline` destrutivo com ícone `Undo2` + texto "Desfazer", mesma condição de visibilidade.
+1. Importar `AlertDialog` e subcomponentes de `@/components/ui/alert-dialog`.
+2. Adicionar estado `notaToRemove: NotaFiscalItem | null`.
+3. No botão da lixeira (linha 274), trocar `onClick={() => handleRemove(n.id)}` por `onClick={() => setNotaToRemove(n)}`.
+4. Renderizar `AlertDialog` no fim do JSX:
+   - Título: **"Remover nota fiscal?"**
+   - Descrição mostra emitente/número/valor da nota selecionada e avisa que a ação não pode ser desfeita.
+   - Botão "Cancelar" e botão destrutivo "Remover" que chama `handleRemove(notaToRemove.id)` e limpa o estado.
 
-### Comportamento
-- Clicar abre o dialog de confirmação já implementado (com aviso sobre estorno do troco e campo obrigatório de motivo).
-- Reaproveita 100% do handler `handleDesfazerBaixa` existente.
-- O botão dentro do modal de detalhes permanece como caminho alternativo.
-
-Sem mudanças de schema, RLS ou novos componentes.
+Sem mudanças de schema, RLS ou outros componentes.

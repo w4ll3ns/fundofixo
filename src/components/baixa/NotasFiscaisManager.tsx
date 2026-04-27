@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogBody } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -67,6 +68,7 @@ export function NotasFiscaisManager({ notas, onChange, storagePathPrefix, inputI
   const { toast } = useToast();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [notaToRemove, setNotaToRemove] = useState<NotaFiscalItem | null>(null);
 
   const [uploading, setUploading] = useState(false);
   const [processing, setProcessing] = useState(false);
@@ -271,7 +273,7 @@ export function NotasFiscaisManager({ notas, onChange, storagePathPrefix, inputI
                 <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEditDialog(n)}>
                   <Pencil className="h-4 w-4" />
                 </Button>
-                <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => handleRemove(n.id)}>
+                <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setNotaToRemove(n)}>
                   <Trash2 className="h-4 w-4" />
                 </Button>
               </div>
@@ -404,6 +406,41 @@ export function NotasFiscaisManager({ notas, onChange, storagePathPrefix, inputI
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={notaToRemove !== null} onOpenChange={(open) => !open && setNotaToRemove(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remover nota fiscal?</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2">
+                <p>Esta ação não pode ser desfeita. A nota será removida da lista e excluída ao salvar.</p>
+                {notaToRemove && (
+                  <div className="rounded-md border border-border bg-muted/30 p-3 text-sm text-foreground">
+                    <p className="font-medium truncate">{notaToRemove.nome_emitente || notaToRemove.fileName || 'Nota fiscal'}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {notaToRemove.numero_nota ? `Nº ${notaToRemove.numero_nota}` : 'Sem número'}
+                      {' • '}
+                      {formatCurrency(Number(notaToRemove.valor))}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (notaToRemove) handleRemove(notaToRemove.id);
+                setNotaToRemove(null);
+              }}
+            >
+              Remover
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
