@@ -495,6 +495,17 @@ export default function AdminSolicitacoes() {
                         Resolver
                       </Button>
                     )}
+                    {(sol.status === 'baixada' || sol.status === 'pendente_ajuste') && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-10 px-4 text-destructive border-destructive hover:bg-destructive/10"
+                        onClick={() => openDesfazer(sol)}
+                      >
+                        <Undo2 className="h-4 w-4 mr-2" />
+                        Desfazer
+                      </Button>
+                    )}
                   </div>
                 </div>
               ))}
