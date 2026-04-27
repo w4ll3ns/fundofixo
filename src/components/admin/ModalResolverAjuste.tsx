@@ -10,7 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatCurrency } from '@/lib/masks';
 import { AlertTriangle, Wallet, HandCoins, Loader2 } from 'lucide-react';
-import { NotaFiscalPreview } from '@/components/solicitacoes/NotaFiscalPreview';
+import { NotasFiscaisList } from '@/components/baixa/NotasFiscaisList';
 
 interface SolicitacaoAjuste {
   id: string;
