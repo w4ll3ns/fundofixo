@@ -1,0 +1,1 @@
+DROP TRIGGER IF EXISTS update_historico_fundos_updated_at ON public.historico_fundos;
